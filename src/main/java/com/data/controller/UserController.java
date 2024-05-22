@@ -189,20 +189,25 @@ public class UserController {
 
 
 	@PostMapping("/accept/{userName}")
-    public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName) {
-        try {
-            User user = userDao.findByUserNameAndIsNewUserTrue(userName);
-            if (user != null) {
-                user.setNewUser(false); // Mark the user as not newly created
-                userDao.save(user);
-                return new ResponseEntity<>(new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully"), HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username"), HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user"), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
+	public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName) {
+	    try {
+	        User user = userDao.findByUserNameAndIsNewUserTrue(userName);
+	        if (user != null) {
+	            user.setNewUser(false); // Mark the user as not newly created
+	            user.setActiveUser(true); // Activate the user
+	            userDao.save(user);
+	            ReqRes response = new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
+	            return ResponseEntity.ok(response);
+	        } else {
+	            ReqRes response = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username");
+	            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+	        }
+	    } catch (Exception e) {
+	        ReqRes response = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user");
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+	    }
+	}
+
 
     @GetMapping("get-user-details/{username}")
     public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
@@ -217,6 +222,21 @@ public class UserController {
             }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+    
+    @PutMapping("/deactivate/{userName}")
+    public ResponseEntity<ReqRes> deactivateUser(@PathVariable String userName) {
+        try {
+            ReqRes response = userService.deactivateUser(userName);
+            if (response.getStatusCode() == 200) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the user"));
         }
     }
 
