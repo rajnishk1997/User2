@@ -63,15 +63,19 @@ public class UserController {
 	@Autowired
 	private ModelMapper modelMapper;
 
-//    @PostConstruct   
-//    public void initPermissions() {
-//    	userService.initPermissions();
-//    }
 
 	@PostConstruct // PostConstruct as I wish to run this code once the compilation is done.
 	public void initRoleAndUser() {
-		userService.initRoleAndUser();
+	    try {
+	        userService.initRoleAndUser();
+	        System.out.println("Roles and users initialized successfully.");
+	    } catch (Exception e) {
+	        // Log the exception and print a meaningful error message
+	        e.printStackTrace();
+	        System.err.println("An error occurred while initializing roles and users: " + e.getMessage());
+	    }
 	}
+
 
 	@PostMapping({ "/registerNewUser" })
 	// @PreAuthorize("hasRole('Admin')")
@@ -137,79 +141,68 @@ public class UserController {
 	
 	
 	@PutMapping("/update/{userName}")
-    public ResponseEntity<ReqRes> updateUser(@PathVariable String userName,
-                                             @RequestBody UserRequestDTO userRequestDTO) {
-        ReqRes response = userService.updateUser(userName, userRequestDTO);
-        if (response.getStatusCode() == 200) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.status(response.getStatusCode()).body(response);
+	public ResponseEntity<ReqRes> updateUser(@PathVariable String userName,
+	                                         @RequestBody UserRequestDTO userRequestDTO) {
+	    try {
+	        ReqRes response = userService.updateUser(userName, userRequestDTO);
+	        if (response.getStatusCode() == 200) {
+	            return ResponseEntity.ok(response);
+	        } else {
+	            return ResponseEntity.status(response.getStatusCode()).body(response);
+	        }
+	    } catch (Exception e) {
+	        ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while updating the user");
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+	    }
+	}
+	
+	@DeleteMapping("/delete/{userName}")
+	public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName) {
+	    try {
+	        ReqRes response = userService.deleteUserByUserName(userName);
+	        if (response.getStatusCode() == 200) {
+	            return ResponseEntity.ok(response);
+	        } else {
+	            return ResponseEntity.status(response.getStatusCode()).body(response);
+	        }
+	    } catch (Exception e) {
+	        ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+	    }
+	}
+
+	  
+	@GetMapping("/newuser")
+	public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers() {
+	    try {
+	        List<User> newUsers = userDao.findByIsNewUserTrue();
+	        List<UserDTO> userDTOs = newUsers.stream()
+	                                          .map(user -> userService.mapToUserDTO(user))
+	                                          .collect(Collectors.toList());
+	        ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<>(userDTOs, new ReqRes(200, null, "Users retrieved successfully"));
+	        return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
+	    } catch (Exception e) {
+	        ResponseWrapper<List<UserDTO>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
+	        return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
+	    }
+	}
+
+
+	@PostMapping("/accept/{userName}")
+    public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName) {
+        try {
+            User user = userDao.findByUserNameAndIsNewUserTrue(userName);
+            if (user != null) {
+                user.setNewUser(false); // Mark the user as not newly created
+                userDao.save(user);
+                return new ResponseEntity<>(new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully"), HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username"), HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            return new ResponseEntity<>(new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-	
-	
-//	@DeleteMapping("/admin/delete/{userName}")
-//	//@PreAuthorize("hasRole('Admin')")
-//	public ResponseEntity<ResponseWrapper<ReqRes>> deleteUser(@PathVariable String userName) {
-//		try {
-//			java.util.Optional<ReqRes> optionalReqRes = userService.deleteUserByUsername(userName);
-//			if (optionalReqRes.isPresent()) {
-//				ReqRes reqRes = optionalReqRes.get();
-//				return ResponseEntity.ok(new ResponseWrapper<>(reqRes, reqRes));
-//			} else {
-//				ReqRes reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "");
-//				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseWrapper<>(reqRes, reqRes));
-//			}
-//		} catch (Exception e) {
-//			ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
-//					"An error occurred while deleting the user");
-//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(reqRes, reqRes));
-//		}
-//	}
-	
-	  @DeleteMapping("/delete/{username}")
-	    public ResponseEntity<ReqRes> deleteUser(@PathVariable String username) {
-	        try {
-	        	 User user = userService.getUserByUsernameForDeletion(username);
-	        	    
-	        	    if (user != null) {
-	        	        int userRid = user.getUserRid(); // Obtain the u_rid from the fetched User entity
-	        	        
-	        	        // Call the deleteUserByUsername method with the obtained u_rid
-	        	        ReqRes isDeleted = userService.deleteUserByUsername(username, userRid);
-	        	        
-	        	        return ResponseEntity.ok(isDeleted);
-	        	    } else {
-	        	        // Handle the case where the user with the given username is not found
-	        	        return ResponseEntity.notFound().build();
-	        	    }
-	            
-	           
-	        } catch (Exception e) {
-	            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Error deleting user", e.getMessage());
-	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ReqRes());
-	        }
-	    }
-	  
-	  @GetMapping("/newuser")
-	  public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers() {
-	      List<User> newUsers = userDao.findByIsNewUserTrue();
-	      List<UserDTO> userDTOs = newUsers.stream().map(user -> userService.mapToUserDTO(user)).collect(Collectors.toList());
-	      ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<List<UserDTO>>(userDTOs, new ReqRes("success", "Users retrieved successfully"));
-	      return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-	  }
-
-	  @PostMapping("/accept/{userName}")
-	    public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName) {
-	        User user = userDao.findByUserNameAndIsNewUserTrue(userName);
-	        if (user != null) {
-	            user.setNewUser(false); // Mark the user as not newly created
-	            userDao.save(user);
-	            return new ResponseEntity<>(new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully"), HttpStatus.OK);
-	        } else {
-	            return new ResponseEntity<>(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username"), HttpStatus.NOT_FOUND);
-	        }
-	    }
 
     @GetMapping("get-user-details/{username}")
     public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
