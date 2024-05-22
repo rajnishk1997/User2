@@ -666,5 +666,16 @@ public class UserService {
 	    }
 	}
 
+	public ReqRes deactivateUser(String userName) {
+        Optional<User> optionalUser = userDao.findByUserName(userName);
+        if (!optionalUser.isPresent()) {
+            return new ReqRes(404, "Not Found", "User not found");
+        }
+
+        User user = optionalUser.get();
+        user.setActiveUser(false);
+        userDao.save(user);
+        return new ReqRes(200, null, "User deactivated successfully");
+    }
 
 }
