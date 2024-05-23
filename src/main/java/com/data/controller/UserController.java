@@ -28,6 +28,7 @@ import com.optum.dao.UserDao;
 import com.optum.dao.UserRoleDao;
 import com.optum.dto.RoleDTO;
 import com.optum.dto.UserDTO;
+import com.optum.dto.UserInfo;
 import com.optum.dto.request.UserRequestDTO;
 import com.optum.entity.*;
 import com.optum.service.UserService;
@@ -112,8 +113,8 @@ public class UserController {
 
 	// Method to match useCases:
 	
-	@GetMapping("/admin/get-all-users-case")
-	public ResponseEntity<ResponseWrapper<List<UserDTO>>> getAllUsersCases(@RequestParam(required = true) String keyword) {
+	@GetMapping("/search")
+	public ResponseEntity<ResponseWrapper<List<UserInfo>>> getAllUsersCases(@RequestParam(required = true) String keyword) {
 	    try {
 	        List<User> userList;
 	        if (keyword.isEmpty()) {
@@ -122,21 +123,23 @@ public class UserController {
 	            userList = userService.searchUsersByKeyword(keyword);
 	        }
 
-	        List<UserDTO> userDTOList = userList.stream()
-	                                             .map(userService::mapToUserDTO)
-	                                             .collect(Collectors.toList());
+	        List<UserInfo> userInfoList = userList.stream()
+	                                              .map(userService::mapToUserInfo)
+	                                              .collect(Collectors.toList());
 
 	        ReqRes reqRes;
-	        if (userDTOList.isEmpty()) {
+	        if (userInfoList.isEmpty()) {
 	            reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
 	        } else {
 	            reqRes = new ReqRes(HttpStatus.OK.value(), null, "Users retrieved successfully");
 	        }
-	        return ResponseEntity.ok(new ResponseWrapper<>(userDTOList, reqRes));
+	        return ResponseEntity.ok(new ResponseWrapper<>(userInfoList, reqRes));
 	    } catch (Exception e) {
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+	        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while retrieving users");
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));
 	    }
 	}
+
 
 	
 	
@@ -253,35 +256,6 @@ public class UserController {
 		return "This URL is only accessible to the user";
 	}
 	
-	// Method to match exact user
-    @GetMapping("/admin/get-all-users")
-    public ResponseEntity<ResponseWrapper<List<UserDTO>>> getAllUsers(@RequestParam(required = false) String userName,
-            @RequestParam(required = false) String userFirstName) {
-        try {
-            List<User> userList;
-            if (userName != null) {
-                userList = userService.findByUserName(userName);
-            } else if (userFirstName != null) {
-                userList = userService.findByUserFirstName(userFirstName);
-            } else {
-                userList = userService.getAllUsers();
-            }
-
-            List<UserDTO> userDTOList = userList.stream()
-                    .map(userService::mapToUserDTO)
-                    .collect(Collectors.toList());
-
-            ReqRes reqRes;
-            if (userDTOList.isEmpty()) {
-                reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
-            } else {
-                reqRes = new ReqRes(HttpStatus.OK.value(), null, "Users retrieved successfully");
-            }
-            return ResponseEntity.ok(new ResponseWrapper<>(userDTOList, reqRes));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
-    }
 
 
 }
