@@ -6,6 +6,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 
 import com.optum.dao.PermissionDao;
 import com.optum.dao.ReqRes;
@@ -16,6 +18,7 @@ import com.optum.dao.UserRoleDao;
 import com.optum.dto.PermissionDTO;
 import com.optum.dto.RoleDTO;
 import com.optum.dto.UserDTO;
+import com.optum.dto.UserInfo;
 import com.optum.dto.request.UserRequestDTO;
 import com.optum.entity.JwtResponse;
 import com.optum.entity.Permission;
@@ -45,8 +48,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
-//	@Value("${permissions}")
-//    private String permissionsName;
+    @PersistenceContext
+    private EntityManager entityManager;
 
 	private static final Logger logger = LogManager.getLogger(UserService.class);
 
@@ -201,9 +204,9 @@ public class UserService {
 			}
 
 			// Null checks
-			if (userRequestDTO.getRoles() == null || userRequestDTO.getRoles().isEmpty()) {
-				throw new IllegalArgumentException("Invalid user data");
-			}
+//			if (userRequestDTO.getRoles() == null || userRequestDTO.getRoles().isEmpty()) {
+//				throw new IllegalArgumentException("Invalid user data");
+//			}
 
 			// Retrieve existing roles and their permissions from the database
 			Set<Role> userRoles = new HashSet<>();
@@ -227,12 +230,12 @@ public class UserService {
 			String firstName = user.getUserFirstName();
 			String lastName = user.getUserLastName();
 			String generatedUserName = generateUserName(firstName, lastName);
-			String userFullName = createFullName(firstName, user.getUserMiddleName(), lastName);
+			//String userFullName = createFullName(firstName, user.getUserMiddleName(), lastName);
 
 			user.setUserName(generatedUserName);
 			user.setUserPassword(encryptedPassword);
 			user.setUserPlainPassword(plainPassword); // Set plain password
-			user.setUserFullName(userFullName);
+			//user.setUserFullName(userFullName);
 
 			// Set created date, created by, modified date, and modified by
 			Date currentDate = new Date();
@@ -325,69 +328,70 @@ public class UserService {
 
 	@Transactional
 	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
-		logger.info("Updating user with username: {}", userName);
-		Optional<User> optionalUser = userDao.findByUserName(userName);
-		if (!optionalUser.isPresent()) {
-			logger.warn("User not found with username: {}", userName);
-			return new ReqRes(404, "Not Found", "User not found");
-		}
+	    logger.info("Updating user with username: {}", userName);
+	    Optional<User> optionalUser = userDao.findByUserName(userName);
+	    if (!optionalUser.isPresent()) {
+	        logger.warn("User not found with username: {}", userName);
+	        return new ReqRes(404, "Not Found", "User not found");
+	    }
 
-		User user = optionalUser.get();
+	    User user = optionalUser.get();
 
-		// Update user fields
-		logger.info("Updating user fields for username: {}", userName);
-		user.setUserFirstName(userRequestDTO.getUserFirstName());
-		user.setUserLastName(userRequestDTO.getUserLastName());
-		user.setUserEmail(userRequestDTO.getUserEmail());
+	    // Update user fields
+	    logger.info("Updating user fields for username: {}", userName);
+	    user.setUserFirstName(userRequestDTO.getUserFirstName());
+	    user.setUserLastName(userRequestDTO.getUserLastName());
+	    user.setUserEmail(userRequestDTO.getUserEmail());
 
-		// Get new roles from the request
-		Set<Role> newRoles = new HashSet<>();
-		for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
-			Role role = roleDao.findByRoleRid(roleDTO.getRoleRid()).orElseThrow(() -> {
-				logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
-				return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
-			});
-			newRoles.add(role);
-		}
+	    // Get new roles from the request
+	    Set<Role> newRoles = new HashSet<>();
+	    for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
+	        Role role = roleDao.findByRoleRid(roleDTO.getRoleRid())
+	                .orElseThrow(() -> {
+	                    logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
+	                    return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
+	                });
+	        newRoles.add(role);
+	    }
 
-		logger.info("New roles prepared for user: {}", userName);
+	    logger.info("New roles prepared for user: {}", userName);
 
-		// Determine roles to be removed
-		Set<UserRole> rolesToRemove = new HashSet<>();
-		for (UserRole userRole : user.getUserRoles()) {
-			if (!newRoles.contains(userRole.getRole())) {
-				rolesToRemove.add(userRole);
-				logger.info("Role marked for removal: {}", userRole.getRole());
-			}
-		}
+	    // Determine roles to be removed
+	    Set<UserRole> rolesToRemove = new HashSet<>();
+	    for (UserRole userRole : user.getUserRoles()) {
+	        if (!newRoles.contains(userRole.getRole())) {
+	            rolesToRemove.add(userRole);
+	            logger.info("Role marked for removal: {}", userRole.getRole());
+	        }
+	    }
 
-		// Remove roles not present in newRoles
-		logger.info("Removing roles not present in newRoles for user: {}", userName);
-		for (UserRole userRole : rolesToRemove) {
-			user.removeUserRole(userRole); // Remove from user's collection
-			userRole.setUser(null); // Disassociate from user
-			userRoleDao.delete(userRole); // Delete from database
-			logger.info("Removed UserRole: {}", userRole);
-		}
+	    // Remove roles not present in newRoles
+	    logger.info("Removing roles not present in newRoles for user: {}", userName);
+	    for (UserRole userRole : rolesToRemove) {
+	        user.removeUserRole(userRole); // Remove from user's collection
+	        userRole.setUser(null); // Disassociate from user
+	        userRoleDao.delete(userRole); // Delete from database
+	        logger.info("Removed UserRole: {}", userRole);
+	    }
 
-		// Save changes to the database to ensure roles are removed
-		userRoleDao.flush();
-		userDao.flush(); // Ensure that deletions are flushed to the database
+	    // Save changes to the database to ensure roles are removed
+	    userRoleDao.flush();
+	    userDao.flush(); // Ensure that deletions are flushed to the database
 
-		// Add new roles
-		logger.info("Adding new roles for user: {}", userName);
-		for (Role role : newRoles) {
-			if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
-				user.addRole(role);
-				logger.info("Role added: {}", role);
-			}
-		}
+	    // Add new roles
+	    logger.info("Adding new roles for user: {}", userName);
+	    for (Role role : newRoles) {
+	        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
+	            user.addRole(role);
+	            logger.info("Role added: {}", role);
+	        }
+	    }
 
-		// Save updated user
-		userDao.save(user);
-		logger.info("User updated successfully: {}", userName);
+	    // Save updated user
+	    userDao.save(user);
+	    logger.info("User updated successfully: {}", userName);
 
-		return new ReqRes(200, null, "User updated successfully");
+	    return new ReqRes(200, null, "User updated successfully");
 	}
 
 	public Optional<User> updateUserByUserId(Integer userId, User updatedUser) {
@@ -425,36 +429,6 @@ public class UserService {
 			return Optional.empty(); // User not found
 		}
 	}
-
-//	public Optional<ReqRes> deleteUserByUsername(String userName) {
-//		Optional<User> optionalUser = userDao.findByUserName(userName);
-//		if (optionalUser.isPresent()) {
-//			User user = optionalUser.get();
-//			// Delete associated roles from user_role table
-//			user.setRoles(null); // Remove all roles from the user
-//			userDao.save(user); // Save the user without roles, which will cascade the deletion of associated
-//								// roles
-//			userDao.delete(optionalUser.get());
-//			return Optional.of(new ReqRes(HttpStatus.OK.value(), "", "User deleted successfully"));
-//		} else {
-//			return Optional.of(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", ""));
-//		}
-//	}
-
-//	 @Transactional
-//	public ReqRes deleteUserByUsername(String username) {
-//	    Optional<User> optionalUser = userDao.findByUserName(username);
-//	    if (optionalUser.isPresent()) {
-//	        User user = optionalUser.get();
-//	        
-//	        // Delete the User entity
-//	        userDao.delete(user);
-//	        
-//	        return new ReqRes(HttpStatus.OK.value(), null, "User deleted successfully");
-//	    } else {
-//	        return new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No user found with the given username");
-//	    }
-//	}
 
 	public ReqRes deleteUserByUsernameOld(String username, int userRid) {
 		// userDao.deleteUserByUserName(username);
@@ -504,32 +478,41 @@ public class UserService {
 		 return userDao.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserNameContainingIgnoreCase(
 		            keyword, keyword, keyword, keyword);
 	}
+	
+//	public List<User> searchUsersByKeyword(String keyword) {
+//	    String query = "SELECT u FROM User u LEFT JOIN FETCH u.userRoles ur LEFT JOIN FETCH ur.role r WHERE "
+//	                   + "u.userFirstName LIKE :keyword OR u.userLastName LIKE :keyword OR u.userName LIKE :keyword";
+//	    return entityManager.createQuery(query, User.class)
+//	                        .setParameter("keyword", "%" + keyword + "%")
+//	                        .getResultList();
+//	}
+
 
 	public List<User> findByUserName(String userName) {
 		Optional<User> userOptional = userDao.findByUserName(userName);
 		return userOptional.map(Collections::singletonList).orElseGet(Collections::emptyList);
 	}
 
-	public List<User> findByUserFirstName(String userFirstName) {
-		return userDao.findByUserFirstName(userFirstName);
-	}
+//	public List<User> findByUserFirstName(String userFirstName) {
+//		return userDao.findByUserFirstName(userFirstName);
+//	}
 
 //	public User getUserByUsername(String userName) {
 //		Optional<User> optionalUser = userDao.findByUserName(userName);
 //        return optionalUser.orElse(null);
 //	}
 
-	public User getUserByNames(String name) {
-		Optional<User> optionalUser = userDao
-				.findByUserFirstNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCase(
-						name, name, name);
-		return optionalUser.orElse(null);
-	}
+//	public User getUserByNames(String name) {
+//		Optional<User> optionalUser = userDao
+//				.findByUserFirstNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCase(
+//						name, name, name);
+//		return optionalUser.orElse(null);
+//	}
 
-	public List<User> findByUserLastName(String userLastName) {
-		// TODO Auto-generated method stub
-		return userDao.findByUserLastName(userLastName);
-	}
+//	public List<User> findByUserLastName(String userLastName) {
+//		// TODO Auto-generated method stub
+//		return userDao.findByUserLastName(userLastName);
+//	}
 
 	@Transactional
 	public void saveUserWithRoles(User user, Set<Role> roles) {
@@ -594,6 +577,17 @@ public class UserService {
 		permissionDTO.setPermissionName(permission.getPermissionName());
 		return permissionDTO;
 	}
+	
+	public UserInfo mapToUserInfo(User user) {
+	    return new UserInfo(
+	        user.getUserName(),
+	        user.getUserFirstName(),
+	        user.getUserLastName(),
+	        user.getUserEmail(),
+	        user.isActiveUser()
+	    );
+	}
+
 
 	// Generate a plain password
 	private String generatePlainPassword() {
@@ -607,31 +601,6 @@ public class UserService {
 		return new BCryptPasswordEncoder().encode(plainPassword);
 	}
 
-//	@Transactional
-//	public ReqRes deleteUserByUserName(String userName) {
-//		Optional<User> optionalUser = userDao.findByUserName(userName);
-//		if (!optionalUser.isPresent()) {
-//			return new ReqRes(404, "Not Found", "User not found");
-//		}
-//
-//		User user = optionalUser.get();
-//
-//		// Collect UserRole mappings for deletion
-//		Set<UserRole> userRolesToDelete = new HashSet<>(user.getUserRoles());
-//
-//		// Disassociate UserRole mappings
-//		user.getUserRoles().forEach(userRole -> userRole.setUser(null));
-//		user.getUserRoles().clear();
-//
-//		// Delete UserRole mappings
-//		userRoleDao.deleteAll(userRolesToDelete);
-//		userRoleDao.flush(); // Ensure the deletions are flushed to the database
-//
-//		// Delete the user from the database
-//		userDao.delete(user);
-//
-//		return new ReqRes(200, null, "User deleted successfully");
-//	}
 	
 	@Transactional
 	public ReqRes deleteUserByUserName(String userName) {
