@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.optum.dao.RoleDao;
 import com.optum.dto.RoleDTO;
+import com.optum.dto.RoleInfo;
 import com.optum.entity.Role;
 
 @Service
@@ -41,9 +42,9 @@ public class RoleService {
     }
     
     @Transactional
-    public List<RoleDTO> getAllRoles() {
+    public List<RoleInfo> getAllRoles() {
         return roleRepository.findAll().stream()
-                             .map(role -> new RoleDTO(role.getRoleRid(), role.getRoleName()))
+                             .map(role -> new RoleInfo(role.getRoleRid(), role.getRoleName()))
                              .collect(Collectors.toList());
     }
 }
