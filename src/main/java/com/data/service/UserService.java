@@ -184,84 +184,65 @@ public class UserService {
 		userDao.save(managerRoleUser);
 	}
 
-	@Transactional
-	public RegistrationResponse<User> registerNewUser(UserRequestDTO userRequestDTO) {
-		try {
-			// Log incoming request
-			logger.debug("Registering new user with details: {}", userRequestDTO);
+	 @Transactional
+	    public RegistrationResponse<User> registerNewUser(UserRequestDTO userRequestDTO) {
+	        try {
+	            // Log incoming request
+	            logger.debug("Registering new user with details: {}", userRequestDTO);
 
-			// Manual conversion of UserRequestDTO to User entity
-			User user = new User();
-			user.setUserFirstName(userRequestDTO.getUserFirstName());
-			user.setUserLastName(userRequestDTO.getUserLastName());
-			user.setUserEmail(userRequestDTO.getUserEmail());
-			user.setUserEmployeeId(userRequestDTO.getUserEmployeeId());
-			user.setCurrentUserId(userRequestDTO.getCurrentUserId());
+	            // Check if user already exists by email
+	            if (userDao.existsByUserEmail(userRequestDTO.getUserEmail())) {
+	                throw new IllegalArgumentException("User already exists with email: " + userRequestDTO.getUserEmail());
+	            }
 
-			// Check if user already exists by email
-			if (userDao.existsByUserEmail(user.getUserEmail())) {
-				throw new IllegalArgumentException("User already exists with email: " + user.getUserEmail());
-			}
+	            // Retrieve existing roles and their permissions from the database
+	            Set<Role> userRoles = fetchRoles(userRequestDTO.getRoles());
 
-			// Null checks
-//			if (userRequestDTO.getRoles() == null || userRequestDTO.getRoles().isEmpty()) {
-//				throw new IllegalArgumentException("Invalid user data");
-//			}
+	            // Create User entity
+	            User user = mapToUserEntity(userRequestDTO, userRoles);
 
-			// Retrieve existing roles and their permissions from the database
-			Set<Role> userRoles = new HashSet<>();
-			for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
-				// Find the existing role by name
-				Role role = roleDao.findByRoleName(roleDTO.getRoleName()).orElseThrow(
-						() -> new IllegalArgumentException("Role not found with name: " + roleDTO.getRoleName()));
+	            // Encrypt the password
+	            String plainPassword = generatePlainPassword(); 
+	            user.setUserPassword(passwordEncoder.encode(plainPassword));
+	            user.setUserPlainPassword(plainPassword);
 
-				// Add the role to the user
-				userRoles.add(role);
-			}
+	            // Save the user
+	            User savedUser = userDao.save(user);
 
-			// Set the roles for the user
-			user.setRoles(userRoles);
+	            // Create and return the registration response
+	            return new RegistrationResponse<>(HttpStatus.CREATED.value(), null, "Successfully Registered User",
+	                    savedUser.getUserName(), savedUser.getUserPlainPassword());
+	        } catch (IllegalArgumentException e) {
+	            logger.error("Error registering new user: " + e.getMessage());
+	            throw e;
+	        } catch (Exception e) {
+	            logger.error("An error occurred while registering the user", e);
+	            throw new UserRegistrationException("An error occurred while registering the user", e);
+	        }
+	    }
 
-			// Generate plain password and encrypted password
-			String plainPassword = generatePlainPassword(); // Generate plain password method
-			String encryptedPassword = encryptPassword(plainPassword); // Encrypt plain password method
+	    private Set<Role> fetchRoles(Set<RoleDTO> roleDTOs) {
+	        Set<String> roleNames = roleDTOs.stream()
+	                                        .map(RoleDTO::getRoleName)
+	                                        .collect(Collectors.toSet());
+	        return new HashSet<>(roleDao.findByRoleNameIn(roleNames));
+	    }
 
-			// Set the generated username, plain password, encrypted password, and full name
-			String firstName = user.getUserFirstName();
-			String lastName = user.getUserLastName();
-			String generatedUserName = generateUserName(firstName, lastName);
-			//String userFullName = createFullName(firstName, user.getUserMiddleName(), lastName);
-
-			user.setUserName(generatedUserName);
-			user.setUserPassword(encryptedPassword);
-			user.setUserPlainPassword(plainPassword); // Set plain password
-			//user.setUserFullName(userFullName);
-
-			// Set created date, created by, modified date, and modified by
-			Date currentDate = new Date();
-			user.setCreatedDate(currentDate);
-			user.setCreatedBy(user.getCurrentUserId());
-			user.setModifiedDate(currentDate);
-			user.setModifiedBy(user.getCurrentUserId());
-
-			// Save the user
-			User savedUser = userDao.save(user);
-
-			// Create and return the registration response
-			return new RegistrationResponse<>(HttpStatus.CREATED.value(), null, "Successfully Registered User",
-					savedUser.getUserName(), savedUser.getUserPlainPassword()); // Return plain password
-		} catch (IllegalArgumentException e) {
-			// Log the error
-			logger.error("Error registering new user: " + e.getMessage());
-			// Rethrow the exception
-			throw e;
-		} catch (Exception e) {
-			// Log the error
-			logger.error("An error occurred while registering the user", e);
-			// Wrap the exception in a custom application exception and rethrow
-			throw new UserRegistrationException("An error occurred while registering the user", e);
-		}
-	}
+	    private User mapToUserEntity(UserRequestDTO dto, Set<Role> roles) {
+	        User user = new User();
+	        user.setUserFirstName(dto.getUserFirstName());
+	        user.setUserLastName(dto.getUserLastName());
+	        user.setUserEmail(dto.getUserEmail());
+	        user.setCurrentUserId(dto.getCurrentUserId());
+	        user.setRoles(roles);
+	        user.setUserName(generateUserName(dto.getUserFirstName(), dto.getUserLastName()));
+	        Date currentDate = new Date();
+	        user.setCreatedDate(currentDate);
+	        user.setCreatedBy(dto.getCurrentUserId());
+	        user.setModifiedDate(currentDate);
+	        user.setModifiedBy(dto.getCurrentUserId());
+	        return user;
+	    }
 
 	public String generateUserName(String firstName, String lastName) {
 		// Validate input parameters
