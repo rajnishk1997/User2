@@ -82,15 +82,15 @@ public class UserController {
 	// @PreAuthorize("hasRole('Admin')")
 	public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
 		try {
-			Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-			if (principal instanceof UserDetails) {
-				String username = ((UserDetails) principal).getUsername();
-				System.out.println("Current logged in user: " + username);
-			} else {
-				System.out.println("No authenticated user found");
-			}
-
-			
+//			Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+//			if (principal instanceof UserDetails) {
+//				String username = ((UserDetails) principal).getUsername();
+//				System.out.println("Current logged in user: " + username);
+//			} else {
+//				System.out.println("No authenticated user found");
+//			}
+//
+//			
 			RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
 
 			// Populate the RegistrationResponse object
