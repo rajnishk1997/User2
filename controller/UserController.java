@@ -26,10 +26,13 @@ import com.optum.dao.RoleDao;
 import com.optum.dao.RolePermissionDao;
 import com.optum.dao.UserDao;
 import com.optum.dao.UserRoleDao;
+import com.optum.dto.ChangePasswordRequest;
 import com.optum.dto.RoleDTO;
 import com.optum.dto.UserDTO;
+import com.optum.dto.UserInfo;
 import com.optum.dto.request.UserRequestDTO;
 import com.optum.entity.*;
+import com.optum.service.AuditTrailService;
 import com.optum.service.UserService;
 
 import java.util.Collection;
@@ -54,62 +57,56 @@ public class UserController {
 	@Autowired
 	private UserDao userDao;
 
-	@Autowired
-	private RoleDao roleDao;
 
 	@Autowired
-	private RolePermissionDao rolePermissionDao;
+    private AuditTrailService auditTrailService;
 
-	@Autowired
-	private ModelMapper modelMapper;
-
-//    @PostConstruct   
-//    public void initPermissions() {
-//    	userService.initPermissions();
-//    }
 
 	@PostConstruct // PostConstruct as I wish to run this code once the compilation is done.
 	public void initRoleAndUser() {
-		userService.initRoleAndUser();
+	    try {
+	        userService.initRoleAndUser();
+	        System.out.println("Roles and users initialized successfully.");
+	    } catch (Exception e) {
+	        // Log the exception and print a meaningful error message
+	        e.printStackTrace();
+	        System.err.println("An error occurred while initializing roles and users: " + e.getMessage());
+	    }
 	}
 
-	@PostMapping({ "/registerNewUser" })
-	// @PreAuthorize("hasRole('Admin')")
-	public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
-		try {
-			Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-			if (principal instanceof UserDetails) {
-				String username = ((UserDetails) principal).getUsername();
-				System.out.println("Current logged in user: " + username);
-			} else {
-				System.out.println("No authenticated user found");
-			}
 
-			
-			RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
+    @PostMapping("/registerNewUser")
+    public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
+        int currentUserRid = userRequestDTO.getCurrentUserId(); 
+        long startTime = System.currentTimeMillis();
+        try {
+            RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
+            RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.CREATED.value(), "",
+                    "User registered successfully", registeredUser.getUserName(), registeredUser.getPassword());
+            
+            auditTrailService.logAuditTrail("registerNewUser", "SUCCESS", "User registered successfully", currentUserRid);
 
-			// Populate the RegistrationResponse object
-			RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.CREATED.value(), "",
-					"User registered successfully", registeredUser.getUserName(), registeredUser.getPassword() 
-			);
-			return ResponseEntity.status(HttpStatus.CREATED).body(response);
-		} catch (IllegalArgumentException e) {
-			// Specific handling for IllegalArgumentException
-			RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.BAD_REQUEST.value(),
-					"Bad Request", e.getMessage(), null, null);
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-		} catch (Exception e) {
-			// Generic handling for other exceptions
-			RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
-					"Internal Server Error", "An error occurred while registering the user", null, null);
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-		}
-	}
-
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.BAD_REQUEST.value(),
+                    "Bad Request", e.getMessage(), null, null);
+            auditTrailService.logAuditTrail("registerNewUser", "FAILURE", e.getMessage(), currentUserRid);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "Internal Server Error", "An error occurred while registering the user", null, null);
+            auditTrailService.logAuditTrail("registerNewUser", "FAILURE", "An error occurred while registering the user", currentUserRid);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+           logger.info("Action performed in " + duration + "ms");
+        }
+    }
 	// Method to match useCases:
 	
-	@GetMapping("/admin/get-all-users-case")
-	public ResponseEntity<ResponseWrapper<List<UserDTO>>> getAllUsersCases(@RequestParam(required = true) String keyword) {
+	@GetMapping("/search")
+	public ResponseEntity<ResponseWrapper<List<UserInfo>>> getAllUsersCases(@RequestParam(required = true) String keyword) {
 	    try {
 	        List<User> userList;
 	        if (keyword.isEmpty()) {
@@ -118,84 +115,121 @@ public class UserController {
 	            userList = userService.searchUsersByKeyword(keyword);
 	        }
 
-	        List<UserDTO> userDTOList = userList.stream()
-	                                             .map(userService::mapToUserDTO)
-	                                             .collect(Collectors.toList());
+	        List<UserInfo> userInfoList = userList.stream()
+	                                              .map(userService::mapToUserInfo)
+	                                              .collect(Collectors.toList());
 
 	        ReqRes reqRes;
-	        if (userDTOList.isEmpty()) {
+	        if (userInfoList.isEmpty()) {
 	            reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
 	        } else {
 	            reqRes = new ReqRes(HttpStatus.OK.value(), null, "Users retrieved successfully");
 	        }
-	        return ResponseEntity.ok(new ResponseWrapper<>(userDTOList, reqRes));
+	        return ResponseEntity.ok(new ResponseWrapper<>(userInfoList, reqRes));
 	    } catch (Exception e) {
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+	        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while retrieving users");
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));
 	    }
 	}
+
 
 	
 	
 	@PutMapping("/update/{userName}")
     public ResponseEntity<ReqRes> updateUser(@PathVariable String userName,
                                              @RequestBody UserRequestDTO userRequestDTO) {
-        ReqRes response = userService.updateUser(userName, userRequestDTO);
-        if (response.getStatusCode() == 200) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.status(response.getStatusCode()).body(response);
+		int currentUserRid = userRequestDTO.getCurrentUserId(); 
+        long startTime = System.currentTimeMillis();
+        try {
+            ReqRes response = userService.updateUser(userName, userRequestDTO);
+            if (response.getStatusCode() == 200) {
+                auditTrailService.logAuditTrail("updateUser", "SUCCESS", "User updated successfully", currentUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                auditTrailService.logAuditTrail("updateUser", "FAILURE", "Failed to update user: " + response.getMessage(), currentUserRid);
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            auditTrailService.logAuditTrail("updateUser", "FAILURE", "An error occurred while updating the user", currentUserRid);
+            ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while updating the user");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
         }
     }
 	
-	
-//	@DeleteMapping("/admin/delete/{userName}")
-//	//@PreAuthorize("hasRole('Admin')")
-//	public ResponseEntity<ResponseWrapper<ReqRes>> deleteUser(@PathVariable String userName) {
-//		try {
-//			java.util.Optional<ReqRes> optionalReqRes = userService.deleteUserByUsername(userName);
-//			if (optionalReqRes.isPresent()) {
-//				ReqRes reqRes = optionalReqRes.get();
-//				return ResponseEntity.ok(new ResponseWrapper<>(reqRes, reqRes));
-//			} else {
-//				ReqRes reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "");
-//				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseWrapper<>(reqRes, reqRes));
-//			}
-//		} catch (Exception e) {
-//			ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
-//					"An error occurred while deleting the user");
-//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(reqRes, reqRes));
-//		}
-//	}
-	
-	  @DeleteMapping("/delete/{userName}")
-	    public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName) {
-	        ReqRes response = userService.deleteUserByUserName(userName);
-	        if (response.getStatusCode() == 200) {
-	            return ResponseEntity.ok(response);
-	        } else {
-	            return ResponseEntity.status(response.getStatusCode()).body(response);
-	        }
-	    }
-	  
-	  @GetMapping("/newuser")
-	  public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers() {
-	      List<User> newUsers = userDao.findByIsNewUserTrue();
-	      List<UserDTO> userDTOs = newUsers.stream().map(user -> userService.mapToUserDTO(user)).collect(Collectors.toList());
-	      ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<List<UserDTO>>(userDTOs, new ReqRes("success", "Users retrieved successfully"));
-	      return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-	  }
+	@DeleteMapping("/delete/{userName}")
+    public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName,@RequestBody UserRequestDTO userRequestDTO) {
+		int currentUserRid = userRequestDTO.getCurrentUserId(); 
+        long startTime = System.currentTimeMillis();
+        try {
+            ReqRes response = userService.deleteUserByUserName(userName);
+            if (response.getStatusCode() == 200) {
+                auditTrailService.logAuditTrail("deleteUser", "SUCCESS", "User deleted successfully", currentUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                auditTrailService.logAuditTrail("deleteUser", "FAILURE", "Failed to delete user: " + response.getMessage(), currentUserRid);
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            auditTrailService.logAuditTrail("deleteUser", "FAILURE", "An error occurred while deleting the user", currentUserRid);
+            ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
 
-	  @PostMapping("/accept/{userName}")
-	    public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName) {
-	        User user = userDao.findByUserNameAndIsNewUserTrue(userName);
-	        if (user != null) {
-	            user.setNewUser(false); // Mark the user as not newly created
-	            userDao.save(user);
-	            return new ResponseEntity<>(new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully"), HttpStatus.OK);
-	        } else {
-	            return new ResponseEntity<>(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username"), HttpStatus.NOT_FOUND);
-	        }
+	  
+	@GetMapping("/newuser")
+	public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers() {
+	    try {
+	        List<User> newUsers = userDao.findByIsNewUserTrue();
+	        List<UserDTO> userDTOs = newUsers.stream()
+	                                          .map(user -> userService.mapToUserDTO(user))
+	                                          .collect(Collectors.toList());
+	        ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<>(userDTOs, new ReqRes(200, null, "Users retrieved successfully"));
+	        return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
+	    } catch (Exception e) {
+	        ResponseWrapper<List<UserDTO>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
+	        return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
 	    }
+	}
+
+
+	@PostMapping("/accept/{userName}")
+    public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+        Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
+        long startTime = System.currentTimeMillis();
+        try {
+        	User user = userDao.findByUserNameAndIsNewUserTrue(userName);
+            if (user != null) {
+                user.setNewUser(false); // Mark the user as not newly created
+                user.setActiveUser(true); // Activate the user
+                userDao.save(user); // Adjust the method call to match your service
+                ReqRes response = new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
+                auditTrailService.logAuditTrail("acceptNewUser", "SUCCESS", "User accepted successfully", currentUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                ReqRes response = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username");
+                auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "No new user found with the provided username", currentUserRid);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (Exception e) {
+            ReqRes response = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user");
+            auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "An error occurred while accepting the user", currentUserRid);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+
 
     @GetMapping("get-user-details/{username}")
     public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
@@ -212,6 +246,50 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+    
+    @PutMapping("/deactivate/{userName}")
+    public ResponseEntity<ReqRes> deactivateUser(@PathVariable String userName,@RequestBody UserRequestDTO userRequestDTO) {
+        Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
+        long startTime = System.currentTimeMillis();
+        try {
+            ReqRes response = userService.deactivateUser(userName);
+            if (response.getStatusCode() == 200) {
+                auditTrailService.logAuditTrail("deactivateUser", "SUCCESS", "User deactivated successfully", currentUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                auditTrailService.logAuditTrail("deactivateUser", "FAILURE", "Failed to deactivate user: " + response.getMessage(), currentUserRid);
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            auditTrailService.logAuditTrail("deactivateUser", "FAILURE", "An error occurred while deactivating the user", currentUserRid);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the user"));
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+
+    
+    @PostMapping("/change-password")
+    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request ,@RequestBody UserRequestDTO userRequestDTO) {
+        Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
+        long startTime = System.currentTimeMillis();
+        try {
+            userService.changePassword(request.getUsername(), request.getNewPassword());
+            auditTrailService.logAuditTrail("changePassword", "SUCCESS", "Password changed successfully for username: " + request.getUsername(), currentUserRid);
+            return ResponseEntity.ok("Password changed successfully");
+        } catch (RuntimeException e) {
+            auditTrailService.logAuditTrail("changePassword", "FAILURE", "Failed to change password for username: " + request.getUsername() + ". Error: " + e.getMessage(), currentUserRid);
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+
 
 
 	@GetMapping({ "/forAdmin" })
@@ -226,35 +304,6 @@ public class UserController {
 		return "This URL is only accessible to the user";
 	}
 	
-	// Method to match exact user
-    @GetMapping("/admin/get-all-users")
-    public ResponseEntity<ResponseWrapper<List<UserDTO>>> getAllUsers(@RequestParam(required = false) String userName,
-            @RequestParam(required = false) String userFirstName) {
-        try {
-            List<User> userList;
-            if (userName != null) {
-                userList = userService.findByUserName(userName);
-            } else if (userFirstName != null) {
-                userList = userService.findByUserFirstName(userFirstName);
-            } else {
-                userList = userService.getAllUsers();
-            }
-
-            List<UserDTO> userDTOList = userList.stream()
-                    .map(userService::mapToUserDTO)
-                    .collect(Collectors.toList());
-
-            ReqRes reqRes;
-            if (userDTOList.isEmpty()) {
-                reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
-            } else {
-                reqRes = new ReqRes(HttpStatus.OK.value(), null, "Users retrieved successfully");
-            }
-            return ResponseEntity.ok(new ResponseWrapper<>(userDTOList, reqRes));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
-    }
 
 
 }

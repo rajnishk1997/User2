@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.optum.dao.ReqRes;
 import com.optum.dto.RoleDTO;
+import com.optum.dto.RoleInfo;
 import com.optum.entity.ResponseWrapper;
 import com.optum.entity.Role;
 import com.optum.service.RoleService;
@@ -34,9 +35,9 @@ public class RoleController {
     
     @Transactional
     @GetMapping("/getAllRoles")
-    public ResponseEntity<ResponseWrapper<List<RoleDTO>>> getAllRoles() {
+    public ResponseEntity<ResponseWrapper<List<RoleInfo>>> getAllRoles() {
         try {
-            List<RoleDTO> roleList = roleService.getAllRoles();
+            List<RoleInfo> roleList = roleService.getAllRoles();
             
             ReqRes reqRes;
             if (roleList.isEmpty()) {
@@ -49,6 +50,7 @@ public class RoleController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
 
     
     @PutMapping("/{id}")
