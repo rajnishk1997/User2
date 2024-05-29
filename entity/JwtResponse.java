@@ -10,7 +10,7 @@ public class JwtResponse {
 	private int statusCode;
 	private String error;
 	private String message;
-	private Integer currentUserRid;
+	private Integer currentUserId;
 	private String jwtToken;
 	private Set<RoleInfo> roleNames;
 	private String userName;
@@ -44,7 +44,7 @@ public class JwtResponse {
 		this.statusCode = statusCode;
 		this.error = error;
 		this.message = message;
-		this.currentUserRid = user.getUserRid();
+		this.currentUserId = user.getUserRid();
 		this.jwtToken = jwtToken;
 		this.roleNames = roleInfos;
 		this.userName = user.getUserName();
@@ -90,12 +90,12 @@ public class JwtResponse {
 		return error;
 	}
 
-	public Integer getCurrentUserRid() {
-		return currentUserRid;
+	public Integer getCurrentUserId() {
+		return currentUserId;
 	}
 
-	public void setCurrentUserRid(Integer currentUserRid) {
-		this.currentUserRid = currentUserRid;
+	public void setCurrentUserId(Integer currentUserRid) {
+		this.currentUserId = currentUserRid;
 	}
 
 	public void setError(String error) {

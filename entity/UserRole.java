@@ -12,7 +12,7 @@ public class UserRole {
     @Column(name = "ur_rid")
     private Integer userRoleRid;
 
-    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "u_rid")
     private User user;
 

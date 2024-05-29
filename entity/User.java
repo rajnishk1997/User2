@@ -7,7 +7,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "rx_user")
+@Table(name = "rx_user", indexes = {
+        @Index(name = "idx_u_username", columnList = "u_username"),
+        @Index(name = "idx_u_first_name", columnList = "u_first_name"),
+        @Index(name = "idx_u_last_name", columnList = "u_last_name"),
+        @Index(name = "idx_u_user_email", columnList = "u_email")
+})
+
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -6,6 +6,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 
 import com.optum.dao.PermissionDao;
 import com.optum.dao.ReqRes;
@@ -16,6 +18,7 @@ import com.optum.dao.UserRoleDao;
 import com.optum.dto.PermissionDTO;
 import com.optum.dto.RoleDTO;
 import com.optum.dto.UserDTO;
+import com.optum.dto.UserInfo;
 import com.optum.dto.request.UserRequestDTO;
 import com.optum.entity.JwtResponse;
 import com.optum.entity.Permission;
@@ -45,8 +48,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
-//	@Value("${permissions}")
-//    private String permissionsName;
+    @PersistenceContext
+    private EntityManager entityManager;
 
 	private static final Logger logger = LogManager.getLogger(UserService.class);
 
@@ -181,84 +184,65 @@ public class UserService {
 		userDao.save(managerRoleUser);
 	}
 
-	@Transactional
-	public RegistrationResponse<User> registerNewUser(UserRequestDTO userRequestDTO) {
-		try {
-			// Log incoming request
-			logger.debug("Registering new user with details: {}", userRequestDTO);
+	 @Transactional
+	    public RegistrationResponse<User> registerNewUser(UserRequestDTO userRequestDTO) {
+	        try {
+	            // Log incoming request
+	            logger.debug("Registering new user with details: {}", userRequestDTO);
 
-			// Manual conversion of UserRequestDTO to User entity
-			User user = new User();
-			user.setUserFirstName(userRequestDTO.getUserFirstName());
-			user.setUserLastName(userRequestDTO.getUserLastName());
-			user.setUserEmail(userRequestDTO.getUserEmail());
-			user.setUserEmployeeId(userRequestDTO.getUserEmployeeId());
-			user.setCurrentUserId(userRequestDTO.getCurrentUserId());
+	            // Check if user already exists by email
+	            if (userDao.existsByUserEmail(userRequestDTO.getUserEmail())) {
+	                throw new IllegalArgumentException("User already exists with email: " + userRequestDTO.getUserEmail());
+	            }
 
-			// Check if user already exists by email
-			if (userDao.existsByUserEmail(user.getUserEmail())) {
-				throw new IllegalArgumentException("User already exists with email: " + user.getUserEmail());
-			}
+	            // Retrieve existing roles and their permissions from the database
+	            Set<Role> userRoles = fetchRoles(userRequestDTO.getRoles());
 
-			// Null checks
-			if (userRequestDTO.getRoles() == null || userRequestDTO.getRoles().isEmpty()) {
-				throw new IllegalArgumentException("Invalid user data");
-			}
+	            // Create User entity
+	            User user = mapToUserEntity(userRequestDTO, userRoles);
 
-			// Retrieve existing roles and their permissions from the database
-			Set<Role> userRoles = new HashSet<>();
-			for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
-				// Find the existing role by name
-				Role role = roleDao.findByRoleName(roleDTO.getRoleName()).orElseThrow(
-						() -> new IllegalArgumentException("Role not found with name: " + roleDTO.getRoleName()));
+	            // Encrypt the password
+	            String plainPassword = generatePlainPassword(); 
+	            user.setUserPassword(passwordEncoder.encode(plainPassword));
+	            user.setUserPlainPassword(plainPassword);
 
-				// Add the role to the user
-				userRoles.add(role);
-			}
+	            // Save the user
+	            User savedUser = userDao.save(user);
 
-			// Set the roles for the user
-			user.setRoles(userRoles);
+	            // Create and return the registration response
+	            return new RegistrationResponse<>(HttpStatus.CREATED.value(), null, "Successfully Registered User",
+	                    savedUser.getUserName(), savedUser.getUserPlainPassword());
+	        } catch (IllegalArgumentException e) {
+	            logger.error("Error registering new user: " + e.getMessage());
+	            throw e;
+	        } catch (Exception e) {
+	            logger.error("An error occurred while registering the user", e);
+	            throw new UserRegistrationException("An error occurred while registering the user", e);
+	        }
+	    }
 
-			// Generate plain password and encrypted password
-			String plainPassword = generatePlainPassword(); // Generate plain password method
-			String encryptedPassword = encryptPassword(plainPassword); // Encrypt plain password method
+	    private Set<Role> fetchRoles(Set<RoleDTO> roleDTOs) {
+	        Set<String> roleNames = roleDTOs.stream()
+	                                        .map(RoleDTO::getRoleName)
+	                                        .collect(Collectors.toSet());
+	        return new HashSet<>(roleDao.findByRoleNameIn(roleNames));
+	    }
 
-			// Set the generated username, plain password, encrypted password, and full name
-			String firstName = user.getUserFirstName();
-			String lastName = user.getUserLastName();
-			String generatedUserName = generateUserName(firstName, lastName);
-			String userFullName = createFullName(firstName, user.getUserMiddleName(), lastName);
-
-			user.setUserName(generatedUserName);
-			user.setUserPassword(encryptedPassword);
-			user.setUserPlainPassword(plainPassword); // Set plain password
-			user.setUserFullName(userFullName);
-
-			// Set created date, created by, modified date, and modified by
-			Date currentDate = new Date();
-			user.setCreatedDate(currentDate);
-			user.setCreatedBy(user.getCurrentUserId());
-			user.setModifiedDate(currentDate);
-			user.setModifiedBy(user.getCurrentUserId());
-
-			// Save the user
-			User savedUser = userDao.save(user);
-
-			// Create and return the registration response
-			return new RegistrationResponse<>(HttpStatus.CREATED.value(), null, "Successfully Registered User",
-					savedUser.getUserName(), savedUser.getUserPlainPassword()); // Return plain password
-		} catch (IllegalArgumentException e) {
-			// Log the error
-			logger.error("Error registering new user: " + e.getMessage());
-			// Rethrow the exception
-			throw e;
-		} catch (Exception e) {
-			// Log the error
-			logger.error("An error occurred while registering the user", e);
-			// Wrap the exception in a custom application exception and rethrow
-			throw new UserRegistrationException("An error occurred while registering the user", e);
-		}
-	}
+	    private User mapToUserEntity(UserRequestDTO dto, Set<Role> roles) {
+	        User user = new User();
+	        user.setUserFirstName(dto.getUserFirstName());
+	        user.setUserLastName(dto.getUserLastName());
+	        user.setUserEmail(dto.getUserEmail());
+	        user.setCurrentUserId(dto.getCurrentUserId());
+	        user.setRoles(roles);
+	        user.setUserName(generateUserName(dto.getUserFirstName(), dto.getUserLastName()));
+	        Date currentDate = new Date();
+	        user.setCreatedDate(currentDate);
+	        user.setCreatedBy(dto.getCurrentUserId());
+	        user.setModifiedDate(currentDate);
+	        user.setModifiedBy(dto.getCurrentUserId());
+	        return user;
+	    }
 
 	public String generateUserName(String firstName, String lastName) {
 		// Validate input parameters
@@ -322,69 +306,6 @@ public class UserService {
 
 		return fullName.toString();
 	}
-
-//	public Optional<User> updateUserByUsername(String userName, User updatedUser,Set<String>previousRoleNames, Set<String> newRoleNames) {
-//		try {
-//			Optional<User> optionalUser = userDao.findByUserName(userName);
-//			if (optionalUser.isPresent()) {
-//				User user = optionalUser.get();
-//				// Update other user fields if needed
-//				user.setUserFirstName(updatedUser.getUserFirstName());
-//				user.setUserLastName(updatedUser.getUserLastName());
-//				user.setUserEmail(updatedUser.getUserEmail());
-//				user.setUserDesignation(updatedUser.getUserDesignation());
-//
-//				int userId = user.getUserRid();
-//
-//				// Update roles
-//				updateUserRoles(user, newRoleNames);
-//
-//				// Save the updated user
-//				User savedUser = userDao.save(user);
-//				return Optional.of(savedUser);
-//			} else {
-//				return Optional.empty(); // User not found
-//			}
-//		} catch (Exception e) {
-//			// Log the exception or handle it appropriately
-//			e.printStackTrace();
-//			return Optional.empty(); // Return empty indicating failure
-//		}
-//	}
-//
-//	private void updateUserRoles(User user, Set<String> newRoleNames) {
-//		Set<UserRole> currentUserRoles = user.getUserRoles();
-//		Set<String> currentRoleNames = currentUserRoles.stream().map(userRole -> userRole.getRole().getRoleName())
-//				.collect(Collectors.toSet());
-//
-//		// Determine roles to be added
-//		Set<String> rolesToAdd = newRoleNames.stream().filter(roleName -> !currentRoleNames.contains(roleName))
-//				.collect(Collectors.toSet());
-//
-//		// Determine roles to be removed
-//		Set<String> rolesToRemove = currentRoleNames.stream().filter(roleName -> !newRoleNames.contains(roleName))
-//				.collect(Collectors.toSet());
-//
-//		// Add new roles to the user
-//		for (String roleName : rolesToAdd) {
-//			Optional<Role> roleOptional = roleDao.findByRoleName(roleName);
-//			roleOptional.ifPresent(role -> {
-//				// Create UserRole entity and save it
-//				UserRole userRole = new UserRole();
-//				userRole.setUser(user);
-//				userRole.setRole(role);
-//				userRole.setCreatedDate(new Date());
-//				userRole.setCreatedBy(user.getCurrentUserId());
-//				userRoleDao.save(userRole);
-//			});
-//		}
-//
-//		// Remove old roles from the user
-//		for (String roleName : rolesToRemove) {
-//			// Remove UserRole entities associated with the removed roles
-//			currentUserRoles.removeIf(userRole -> userRole.getRole().getRoleName().equals(roleName));
-//		}
-//	}
 
 	@Transactional
 	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
@@ -454,7 +375,6 @@ public class UserService {
 	    return new ReqRes(200, null, "User updated successfully");
 	}
 
-
 	public Optional<User> updateUserByUserId(Integer userId, User updatedUser) {
 		Optional<User> optionalUser = userDao.findByUserRid(userId);
 		if (optionalUser.isPresent()) {
@@ -491,41 +411,10 @@ public class UserService {
 		}
 	}
 
-//	public Optional<ReqRes> deleteUserByUsername(String userName) {
-//		Optional<User> optionalUser = userDao.findByUserName(userName);
-//		if (optionalUser.isPresent()) {
-//			User user = optionalUser.get();
-//			// Delete associated roles from user_role table
-//			user.setRoles(null); // Remove all roles from the user
-//			userDao.save(user); // Save the user without roles, which will cascade the deletion of associated
-//								// roles
-//			userDao.delete(optionalUser.get());
-//			return Optional.of(new ReqRes(HttpStatus.OK.value(), "", "User deleted successfully"));
-//		} else {
-//			return Optional.of(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", ""));
-//		}
-//	}
-
-//	 @Transactional
-//	public ReqRes deleteUserByUsername(String username) {
-//	    Optional<User> optionalUser = userDao.findByUserName(username);
-//	    if (optionalUser.isPresent()) {
-//	        User user = optionalUser.get();
-//	        
-//	        // Delete the User entity
-//	        userDao.delete(user);
-//	        
-//	        return new ReqRes(HttpStatus.OK.value(), null, "User deleted successfully");
-//	    } else {
-//	        return new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No user found with the given username");
-//	    }
-//	}
-
 	public ReqRes deleteUserByUsernameOld(String username, int userRid) {
-	//	userDao.deleteUserByUserName(username);
+		// userDao.deleteUserByUserName(username);
 		return new ReqRes(HttpStatus.OK.value(), null, "User deleted successfully");
 	}
-	
 
 	public Optional<ReqRes> deleteUserByUserId(Integer userId) {
 		Optional<User> optionalUser = userDao.findById(userId);
@@ -567,36 +456,44 @@ public class UserService {
 	}
 
 	public List<User> searchUsersByKeyword(String keyword) {
-		return userDao
-				.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCase(
-						keyword, keyword, keyword);
+		 return userDao.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserNameContainingIgnoreCase(
+		            keyword, keyword, keyword, keyword);
 	}
+	
+//	public List<User> searchUsersByKeyword(String keyword) {
+//	    String query = "SELECT u FROM User u LEFT JOIN FETCH u.userRoles ur LEFT JOIN FETCH ur.role r WHERE "
+//	                   + "u.userFirstName LIKE :keyword OR u.userLastName LIKE :keyword OR u.userName LIKE :keyword";
+//	    return entityManager.createQuery(query, User.class)
+//	                        .setParameter("keyword", "%" + keyword + "%")
+//	                        .getResultList();
+//	}
+
 
 	public List<User> findByUserName(String userName) {
 		Optional<User> userOptional = userDao.findByUserName(userName);
 		return userOptional.map(Collections::singletonList).orElseGet(Collections::emptyList);
 	}
 
-	public List<User> findByUserFirstName(String userFirstName) {
-		return userDao.findByUserFirstName(userFirstName);
-	}
+//	public List<User> findByUserFirstName(String userFirstName) {
+//		return userDao.findByUserFirstName(userFirstName);
+//	}
 
 //	public User getUserByUsername(String userName) {
 //		Optional<User> optionalUser = userDao.findByUserName(userName);
 //        return optionalUser.orElse(null);
 //	}
 
-	public User getUserByNames(String name) {
-		Optional<User> optionalUser = userDao
-				.findByUserFirstNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCase(
-						name, name, name);
-		return optionalUser.orElse(null);
-	}
+//	public User getUserByNames(String name) {
+//		Optional<User> optionalUser = userDao
+//				.findByUserFirstNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCase(
+//						name, name, name);
+//		return optionalUser.orElse(null);
+//	}
 
-	public List<User> findByUserLastName(String userLastName) {
-		// TODO Auto-generated method stub
-		return userDao.findByUserLastName(userLastName);
-	}
+//	public List<User> findByUserLastName(String userLastName) {
+//		// TODO Auto-generated method stub
+//		return userDao.findByUserLastName(userLastName);
+//	}
 
 	@Transactional
 	public void saveUserWithRoles(User user, Set<Role> roles) {
@@ -629,6 +526,8 @@ public class UserService {
 	public UserDTO mapToUserDTO(User user) {
 		UserDTO userDTO = new UserDTO();
 		userDTO.setUserFirstName(user.getUserFirstName());
+		userDTO.setUserName(user.getUserName());
+		userDTO.setUserRid(user.getUserRid());
 		userDTO.setUserLastName(user.getUserLastName());
 		userDTO.setUserEmail(user.getUserEmail());
 		userDTO.setUserEmployeeId(user.getUserEmployeeId());
@@ -659,6 +558,17 @@ public class UserService {
 		permissionDTO.setPermissionName(permission.getPermissionName());
 		return permissionDTO;
 	}
+	
+	public UserInfo mapToUserInfo(User user) {
+	    return new UserInfo(
+	        user.getUserName(),
+	        user.getUserFirstName(),
+	        user.getUserLastName(),
+	        user.getUserEmail(),
+	        user.isActiveUser()
+	    );
+	}
+
 
 	// Generate a plain password
 	private String generatePlainPassword() {
@@ -672,54 +582,58 @@ public class UserService {
 		return new BCryptPasswordEncoder().encode(plainPassword);
 	}
 
-//	@Transactional
-//	public ReqRes deleteUserByUserName(String userName) {
-//	    Optional<User> optionalUser = userDao.findByUserName(userName);
-//	    if (!optionalUser.isPresent()) {
-//	        return new ReqRes(404, "Not Found", "User not found");
-//	    }
-//
-//	    User user = optionalUser.get();
-//
-//	    // Disassociate UserRole mappings without deleting them as  Cannot delete or update a parent row: a foreign key constraint fails 
-//	    //(`rxclaim`.`rx_role_permission`, CONSTRAINT `FKnykgry8logbc9k8v14avfwhsk` FOREIGN KEY (`role_id`) REFERENCES `rx_role` (`r_rid`))
-//	    //As we need role_permission mapping and can't delete them that's way we can't delete UserRole mappings as it also contains r_rid which is primary key of Role entity
-//	    user.getUserRoles().forEach(userRole -> userRole.setUser(null));
-//
-//	    // Delete the user from the database
-//	    userDao.delete(user);
-//	    // Save the updated user
-//	    userDao.save(user);
-//
-//	    return new ReqRes(200, null, "User deleted successfully");
-//	}
 	
 	@Transactional
 	public ReqRes deleteUserByUserName(String userName) {
-	    Optional<User> optionalUser = userDao.findByUserName(userName);
-	    if (!optionalUser.isPresent()) {
-	        return new ReqRes(404, "Not Found", "User not found");
+	    try {
+	        Optional<User> optionalUser = userDao.findByUserName(userName);
+	        if (!optionalUser.isPresent()) {
+	            return new ReqRes(404, "Not Found", "User not found");
+	        }
+
+	        User user = optionalUser.get();
+
+	        // Collect UserRole mappings for deletion
+	        Set<UserRole> userRolesToDelete = new HashSet<>(user.getUserRoles());
+
+	        // Disassociate UserRole mappings
+	        user.getUserRoles().forEach(userRole -> userRole.setUser(null));
+	        user.getUserRoles().clear();
+
+	        // Delete UserRole mappings
+	        userRoleDao.deleteAll(userRolesToDelete);
+	        userRoleDao.flush(); // Ensure the deletions are flushed to the database
+
+	        // Delete the user from the database
+	        userDao.delete(user);
+
+	        return new ReqRes(200, null, "User deleted successfully");
+	    } catch (Exception e) {
+	        // Log the error for debugging purposes
+	        logger.error("Error occurred while deleting user: {}", userName, e);
+	        // Return a response indicating an internal server error
+	        return new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
 	    }
-
-	    User user = optionalUser.get();
-
-	    // Collect UserRole mappings for deletion
-	    Set<UserRole> userRolesToDelete = new HashSet<>(user.getUserRoles());
-
-	    // Disassociate UserRole mappings
-	    user.getUserRoles().forEach(userRole -> userRole.setUser(null));
-	    user.getUserRoles().clear();
-
-	    // Delete UserRole mappings
-	    userRoleDao.deleteAll(userRolesToDelete);
-	    userRoleDao.flush(); // Ensure the deletions are flushed to the database
-
-	    // Delete the user from the database
-	    userDao.delete(user);
-
-	    return new ReqRes(200, null, "User deleted successfully");
 	}
 
+	public ReqRes deactivateUser(String userName) {
+        Optional<User> optionalUser = userDao.findByUserName(userName);
+        if (!optionalUser.isPresent()) {
+            return new ReqRes(404, "Not Found", "User not found");
+        }
 
+        User user = optionalUser.get();
+        user.setActiveUser(false);
+        userDao.save(user);
+        return new ReqRes(200, null, "User deactivated successfully");
+    }
+	
+	 @Transactional
+	    public User changePassword(String username, String newPassword) {
+	        Optional<User> userOptional = userDao.findByUserName(username);
+	        User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
+	        user.setUserPassword(passwordEncoder.encode(newPassword));
+	        return userDao.save(user);
+	    }
 
 }

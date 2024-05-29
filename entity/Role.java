@@ -41,10 +41,10 @@ public class Role {
 	}
 
     
-    @OneToMany(mappedBy = "role", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL)
     private Set<UserRole> userRoles = new HashSet<>();
 
-    @OneToMany(mappedBy = "role", fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL)
     private Set<RolePermission> rolePermissions = new HashSet<>();
     
     

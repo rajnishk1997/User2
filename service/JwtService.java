@@ -48,59 +48,70 @@ public class JwtService implements UserDetailsService {
     @Autowired
     private AuthenticationManager authenticationManager;
 
-    public JwtResponse createJwtToken(JwtRequest jwtRequest) throws Exception {
-        String userName = jwtRequest.getUserName();
-        String userPassword = jwtRequest.getUserPassword();
-        authenticate(userName, userPassword);
-
-        UserDetails userDetails = loadUserByUsername(userName);
-        String newGeneratedToken = jwtUtil.generateToken(userDetails);
-        
-        User user = userDao.findByUserName(userName).orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Initialize sets for role infos and permission infos
-        Set<RoleInfo> roleInfos = new HashSet<>();
-
-        // Eagerly fetch user roles along with user data
-        user.getUserRoles().size();
-        
-        // Iterate over user's roles
-        for (UserRole userRole : user.getUserRoles()) {
-            Role role = userRole.getRole();
-
-            // Initialize role info
-            RoleInfo roleInfo = new RoleInfo();
-            roleInfo.setRoleRid(role.getRoleRid());
-            roleInfo.setRoleName(role.getRoleName());
-
-            // Initialize set for permission infos
-            Set<PermissionInfo> permissionInfos = new HashSet<>();
-
-            // Eagerly fetch role permissions along with role data
-            role.getRolePermissions().size();
-
-            // Iterate over role's permissions
-            for (RolePermission rolePermission : role.getRolePermissions()) {
-                Permission permission = rolePermission.getPermission();
-
-                // Initialize permission info
-                PermissionInfo permissionInfo = new PermissionInfo();
-                permissionInfo.setPermissionRid(permission.getPermissionRid());
-                permissionInfo.setPermissionName(permission.getPermissionName());
-
-                // Add permission info to set
-                permissionInfos.add(permissionInfo);
+    public JwtResponse createJwtToken(JwtRequest jwtRequest) {
+        try {
+            String userName = jwtRequest.getUserName();
+            String userPassword = jwtRequest.getUserPassword();
+            try {
+                authenticate(userName, userPassword);
+            } catch (BadCredentialsException e) {
+                return new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null);
             }
 
-            // Set permissions for role
-            roleInfo.setPermissions(permissionInfos);
+            UserDetails userDetails = loadUserByUsername(userName);
+            String newGeneratedToken = jwtUtil.generateToken(userDetails);
+            
+            User user = userDao.findByUserName(userName).orElseThrow(() -> new RuntimeException("User not found"));
 
-            // Add role info to set
-            roleInfos.add(roleInfo);
+            // Initialize sets for role infos and permission infos
+            Set<RoleInfo> roleInfos = new HashSet<>();
+
+            // Eagerly fetch user roles along with user data
+            user.getUserRoles().size();
+            
+            // Iterate over user's roles
+            for (UserRole userRole : user.getUserRoles()) {
+                Role role = userRole.getRole();
+
+                // Initialize role info
+                RoleInfo roleInfo = new RoleInfo();
+                roleInfo.setRoleRid(role.getRoleRid());
+                roleInfo.setRoleName(role.getRoleName());
+
+                // Initialize set for permission infos
+                Set<PermissionInfo> permissionInfos = new HashSet<>();
+
+                // Eagerly fetch role permissions along with role data
+                role.getRolePermissions().size();
+
+                // Iterate over role's permissions
+                for (RolePermission rolePermission : role.getRolePermissions()) {
+                    Permission permission = rolePermission.getPermission();
+
+                    // Initialize permission info
+                    PermissionInfo permissionInfo = new PermissionInfo();
+                    permissionInfo.setPermissionRid(permission.getPermissionRid());
+                    permissionInfo.setPermissionName(permission.getPermissionName());
+
+                    // Add permission info to set
+                    permissionInfos.add(permissionInfo);
+                }
+
+                // Set permissions for role
+                roleInfo.setPermissions(permissionInfos);
+
+                // Add role info to set
+                roleInfos.add(roleInfo);
+            }
+
+            return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
+        } catch (BadCredentialsException e) {
+            return new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null);
+        } catch (Exception e) {
+            return new JwtResponse(500, "Internal Server Error", "Something went wrong", null, null, null);
         }
-
-        return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
     }
+
 
 
     @Override

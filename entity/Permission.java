@@ -29,7 +29,7 @@ public class Permission {
     @Column(name = "p_modify_datetime")
     private Date modifiedDate;
 
-    @OneToMany(mappedBy = "permission", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "permission", cascade = CascadeType.ALL)
     private Set<RolePermission> rolePermissions = new HashSet<>();
 
     public Permission(String string) {
