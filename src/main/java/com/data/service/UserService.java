@@ -627,5 +627,13 @@ public class UserService {
         userDao.save(user);
         return new ReqRes(200, null, "User deactivated successfully");
     }
+	
+	 @Transactional
+	    public User changePassword(String username, String newPassword) {
+	        Optional<User> userOptional = userDao.findByUserName(username);
+	        User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
+	        user.setUserPassword(passwordEncoder.encode(newPassword));
+	        return userDao.save(user);
+	    }
 
 }
