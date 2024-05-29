@@ -26,6 +26,7 @@ import com.optum.dao.RoleDao;
 import com.optum.dao.RolePermissionDao;
 import com.optum.dao.UserDao;
 import com.optum.dao.UserRoleDao;
+import com.optum.dto.ChangePasswordRequest;
 import com.optum.dto.RoleDTO;
 import com.optum.dto.UserDTO;
 import com.optum.dto.UserInfo;
@@ -82,15 +83,6 @@ public class UserController {
 	// @PreAuthorize("hasRole('Admin')")
 	public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
 		try {
-//			Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-//			if (principal instanceof UserDetails) {
-//				String username = ((UserDetails) principal).getUsername();
-//				System.out.println("Current logged in user: " + username);
-//			} else {
-//				System.out.println("No authenticated user found");
-//			}
-//
-//			
 			RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
 
 			// Populate the RegistrationResponse object
@@ -240,6 +232,17 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the user"));
+        }
+    }
+    
+    @PostMapping("/change-password")
+    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request) {
+        try {
+            userService.changePassword(request.getUsername(), request.getNewPassword());
+            //logAction(user.getUserRid(), "Password Changed", "User password changed for username: " + request.getUsername());
+            return ResponseEntity.ok("Password changed successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
