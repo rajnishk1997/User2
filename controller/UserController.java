@@ -108,24 +108,24 @@ public class UserController {
 	@GetMapping("/search")
 	public ResponseEntity<ResponseWrapper<List<UserInfo>>> getAllUsersCases(@RequestParam(required = true) String keyword) {
 	    try {
-	        List<User> userList;
+	        List<UserInfo> userList;
 	        if (keyword.isEmpty()) {
 	            userList = userService.getAllUsers();
 	        } else {
 	            userList = userService.searchUsersByKeyword(keyword);
 	        }
 
-	        List<UserInfo> userInfoList = userList.stream()
-	                                              .map(userService::mapToUserInfo)
-	                                              .collect(Collectors.toList());
+//	        List<UserInfo> userInfoList = userList.stream()
+//	                                              .map(userService::mapToUserInfo)
+//	                                              .collect(Collectors.toList());
 
 	        ReqRes reqRes;
-	        if (userInfoList.isEmpty()) {
+	        if (userList.isEmpty()) {
 	            reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
 	        } else {
 	            reqRes = new ReqRes(HttpStatus.OK.value(), null, "Users retrieved successfully");
 	        }
-	        return ResponseEntity.ok(new ResponseWrapper<>(userInfoList, reqRes));
+	        return ResponseEntity.ok(new ResponseWrapper<>(userList, reqRes));
 	    } catch (Exception e) {
 	        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while retrieving users");
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));

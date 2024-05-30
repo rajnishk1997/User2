@@ -7,18 +7,22 @@ public class UserInfo {
     private String userLastName;
     private String userEmail;
     private boolean isActiveUser;
+    private int userRid;
     
+    public UserInfo(int userRid, String userName, String userFirstName, String userLastName, String userEmail, boolean isActiveUser) {
+        this.userRid = userRid;
+        this.userName = userName;
+        this.userFirstName = userFirstName;
+        this.userLastName = userLastName;
+        this.userEmail = userEmail;
+        this.isActiveUser = isActiveUser;
+    }
     
-    
-    
-	public UserInfo(String userName, String userFirstName, String userLastName, String userEmail,
-			boolean isActiveUser) {
-		super();
-		this.userName = userName;
-		this.userFirstName = userFirstName;
-		this.userLastName = userLastName;
-		this.userEmail = userEmail;
-		this.isActiveUser = isActiveUser;
+	public int getUserRid() {
+		return userRid;
+	}
+	public void setUserRid(int userRid) {
+		this.userRid = userRid;
 	}
 	public String getUserName() {
 		return userName;

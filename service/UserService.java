@@ -430,7 +430,7 @@ public class UserService {
 			return Optional.of(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", ""));
 		}
 	}
-
+	
 //	public List<User> getAllUsers() {
 //		try {
 //			return userDao.findAll();
@@ -441,32 +441,30 @@ public class UserService {
 //	}
 //
 //	public List<User> searchUsersByKeyword(String keyword) {
-//		return userDao
-//				.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCase(
-//						keyword, keyword, keyword);
-//
+//		 return userDao.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserNameContainingIgnoreCase(
+//		            keyword, keyword, keyword, keyword);
 //	}
-	public List<User> getAllUsers() {
-		try {
-			return userDao.findAll();
-		} catch (Exception e) {
-			// Log the exception or handle it as needed
-			return Collections.emptyList(); // Return an empty list in case of an error
-		}
-	}
-
-	public List<User> searchUsersByKeyword(String keyword) {
-		 return userDao.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserNameContainingIgnoreCase(
-		            keyword, keyword, keyword, keyword);
-	}
 	
-//	public List<User> searchUsersByKeyword(String keyword) {
-//	    String query = "SELECT u FROM User u LEFT JOIN FETCH u.userRoles ur LEFT JOIN FETCH ur.role r WHERE "
-//	                   + "u.userFirstName LIKE :keyword OR u.userLastName LIKE :keyword OR u.userName LIKE :keyword";
-//	    return entityManager.createQuery(query, User.class)
-//	                        .setParameter("keyword", "%" + keyword + "%")
-//	                        .getResultList();
-//	}
+	// Custom Query Call for better serach performance:
+
+    public List<UserInfo> getAllUsers() {
+        try {
+            return userDao.findAllUsersWithoutRoles();
+        } catch (Exception e) {
+            // Log the exception or handle it as needed
+            return Collections.emptyList(); // Return an empty list in case of an error
+        }
+    }
+
+    public List<UserInfo> searchUsersByKeyword(String keyword) {
+        try {
+            return userDao.searchUsersByKeywordWithoutRoles(keyword);
+        } catch (Exception e) {
+            // Log the exception or handle it as needed
+            return Collections.emptyList(); // Return an empty list in case of an error
+        }
+    }
+	
 
 
 	public List<User> findByUserName(String userName) {
@@ -561,11 +559,13 @@ public class UserService {
 	
 	public UserInfo mapToUserInfo(User user) {
 	    return new UserInfo(
+	    		user.getUserRid(),
 	        user.getUserName(),
 	        user.getUserFirstName(),
 	        user.getUserLastName(),
 	        user.getUserEmail(),
 	        user.isActiveUser()
+	        
 	    );
 	}
 
