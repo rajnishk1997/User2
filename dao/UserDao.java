@@ -24,7 +24,8 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 			+ "FROM User u WHERE u.isNewUser = true")
 	List<UserInfo> findNewUsers();
 
-	User findByUserNameAndIsNewUserTrue(String userName);
+	@Query("SELECT u FROM User u WHERE u.userName = :userName AND u.isNewUser = true")
+    Optional<User> findByUserNameAndIsNewUserTrue(@Param("userName") String userName);
 
 	List<User> findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserNameContainingIgnoreCase(
 			String keyword, String keyword2, String keyword3, String keyword4);

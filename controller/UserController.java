@@ -194,33 +194,48 @@ public class UserController {
 
 
 	@PostMapping("/accept/{userName}")
-    public ResponseEntity<ReqRes> acceptNewUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
-        Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
-        long startTime = System.currentTimeMillis();
-        try {
-        	User user = userDao.findByUserNameAndIsNewUserTrue(userName);
-            if (user != null) {
-                user.setNewUser(false); // Mark the user as not newly created
-                user.setActiveUser(true); // Activate the user
-                userDao.save(user); // Adjust the method call to match your service
-                ReqRes response = new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
-                auditTrailService.logAuditTrail("acceptNewUser", "SUCCESS", "User accepted successfully", currentUserRid);
-                return ResponseEntity.ok(response);
-            } else {
-                ReqRes response = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username");
-                auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "No new user found with the provided username", currentUserRid);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            }
-        } catch (Exception e) {
-            ReqRes response = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user");
-            auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "An error occurred while accepting the user", currentUserRid);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        } finally {
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-            logger.info("Action performed in " + duration + "ms");
-        }
-    }
+	public ResponseEntity<ResponseWrapper<ChangePasswordRequest>> acceptNewUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+	    Integer currentUserRid = userRequestDTO.getCurrentUserId();
+	    long startTime = System.currentTimeMillis();
+	    try {
+	        ReqRes reqRes = userService.acceptNewUser(userName, userRequestDTO);
+	        if (reqRes.getStatusCode() == HttpStatus.OK.value()) {
+	            Optional<User> optionalUser = userDao.findByUserName(userName);
+	            if (optionalUser.isPresent()) {
+	                User user = optionalUser.get();
+	                ChangePasswordRequest changePasswordRequest = new ChangePasswordRequest();
+	                changePasswordRequest.setUsername(userName);
+	                changePasswordRequest.setNewPassword(user.getUserPassword());
+	             //   changePasswordRequest.setCurrentUserId(currentUserRid);
+
+	                ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(changePasswordRequest, reqRes);
+	                auditTrailService.logAuditTrail("acceptNewUser", "SUCCESS", "User accepted successfully", currentUserRid);
+	                return ResponseEntity.ok(responseWrapper);
+	            } else {
+	                ReqRes notFoundRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "User not found after acceptance");
+	                ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, notFoundRes);
+	                auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", notFoundRes.getMessage(), currentUserRid);
+	                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
+	            }
+	        } else {
+	            ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, reqRes);
+	            auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", reqRes.getMessage(), currentUserRid);
+	            return ResponseEntity.status(reqRes.getStatusCode()).body(responseWrapper);
+	        }
+	    } catch (Exception e) {
+	        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user");
+	        ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, reqRes);
+	        auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "An error occurred while accepting the user", currentUserRid);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
+	    } finally {
+	        long endTime = System.currentTimeMillis();
+	        long duration = endTime - startTime;
+	        logger.info("Action performed in " + duration + "ms");
+	    }
+	}
+
+
+
 
 
     @GetMapping("/get-user-details/{username}")

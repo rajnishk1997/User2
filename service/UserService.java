@@ -703,5 +703,19 @@ public class UserService {
             return Collections.emptyList(); // Return an empty list in case of an error
         }
     }
+	 
+	  public ReqRes acceptNewUser(String userName, UserRequestDTO userRequestDTO) {
+	        Integer currentUserRid = userRequestDTO.getCurrentUserId();
+	        Optional<User> optionalUser = userDao.findByUserNameAndIsNewUserTrue(userName);
+	        if (optionalUser.isPresent()) {
+	            User user = optionalUser.get();
+	            user.setNewUser(false);
+	            user.setActiveUser(true);
+	            userDao.save(user);
+	            return new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
+	        } else {
+	            return new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username");
+	        }
+	    }
 
 }
