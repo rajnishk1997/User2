@@ -223,7 +223,7 @@ public class UserController {
     }
 
 
-    @GetMapping("get-user-details/{username}")
+    @GetMapping("/get-user-details/{username}")
     public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
         try {
             UserDTO user = userService.getUserByUsername(username);

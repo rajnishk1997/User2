@@ -5,16 +5,24 @@ import java.util.List;
 public class UserDTO {
 	private String userName;
     private String userFirstName;
-    private String userMiddleName;
     private String userLastName;
     private String userPassword;
-    private String userMobile;
     private String userEmail;
-    private String userEmployeeId;
     private List<RoleDTO> roleName;
-    private String userDesignation;
     private int userRid;
     
+ // Constructor
+    public UserDTO(String userName, String userFirstName, String userLastName, String userPassword, String userEmail, int userRid) {
+        this.userName = userName;
+        this.userFirstName = userFirstName;
+        this.userLastName = userLastName;
+        this.userPassword = userPassword;
+        this.userEmail = userEmail;
+        this.userRid = userRid;
+    }
+	public UserDTO() {
+		// TODO Auto-generated constructor stub
+	}
 	public int getUserRid() {
 		return userRid;
 	}
@@ -27,12 +35,7 @@ public class UserDTO {
 	public void setUserFirstName(String userFirstName) {
 		this.userFirstName = userFirstName;
 	}
-	public String getUserMiddleName() {
-		return userMiddleName;
-	}
-	public void setUserMiddleName(String userMiddleName) {
-		this.userMiddleName = userMiddleName;
-	}
+
 	public String getUserLastName() {
 		return userLastName;
 	}
@@ -45,9 +48,7 @@ public class UserDTO {
 	public void setUserPassword(String userPassword) {
 		this.userPassword = userPassword;
 	}
-	public String getUserMobile() {
-		return userMobile;
-	}
+	
 	
 	public String getUserName() {
 		return userName;
@@ -55,20 +56,12 @@ public class UserDTO {
 	public void setUserName(String userName) {
 		this.userName = userName;
 	}
-	public void setUserMobile(String userMobile) {
-		this.userMobile = userMobile;
-	}
+	
 	public String getUserEmail() {
 		return userEmail;
 	}
 	public void setUserEmail(String userEmail) {
 		this.userEmail = userEmail;
-	}
-	public String getUserEmployeeId() {
-		return userEmployeeId;
-	}
-	public void setUserEmployeeId(String userEmployeeId) {
-		this.userEmployeeId = userEmployeeId;
 	}
 	
 	public List<RoleDTO> getRoleName() {
@@ -76,12 +69,6 @@ public class UserDTO {
 	}
 	public void setRoleName(List<RoleDTO> roleName) {
 		this.roleName = roleName;
-	}
-	public String getUserDesignation() {
-		return userDesignation;
-	}
-	public void setUserDesignation(String userDesignation) {
-		this.userDesignation = userDesignation;
 	}
 
 	public void setRoles(List<RoleDTO> roles) {

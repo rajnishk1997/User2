@@ -307,6 +307,74 @@ public class UserService {
 		return fullName.toString();
 	}
 
+//	@Transactional
+//	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
+//	    logger.info("Updating user with username: {}", userName);
+//	    Optional<User> optionalUser = userDao.findByUserName(userName);
+//	    if (!optionalUser.isPresent()) {
+//	        logger.warn("User not found with username: {}", userName);
+//	        return new ReqRes(404, "Not Found", "User not found");
+//	    }
+//
+//	    User user = optionalUser.get();
+//
+//	    // Update user fields
+//	    logger.info("Updating user fields for username: {}", userName);
+//	    user.setUserFirstName(userRequestDTO.getUserFirstName());
+//	    user.setUserLastName(userRequestDTO.getUserLastName());
+//	    user.setUserEmail(userRequestDTO.getUserEmail());
+//
+//	    // Get new roles from the request
+//	    Set<Role> newRoles = new HashSet<>();
+//	    for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
+//	        Role role = roleDao.findByRoleRid(roleDTO.getRoleRid())
+//	                .orElseThrow(() -> {
+//	                    logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
+//	                    return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
+//	                });
+//	        newRoles.add(role);
+//	    }
+//
+//	    logger.info("New roles prepared for user: {}", userName);
+//
+//	    // Determine roles to be removed
+//	    Set<UserRole> rolesToRemove = new HashSet<>();
+//	    for (UserRole userRole : user.getUserRoles()) {
+//	        if (!newRoles.contains(userRole.getRole())) {
+//	            rolesToRemove.add(userRole);
+//	            logger.info("Role marked for removal: {}", userRole.getRole());
+//	        }
+//	    }
+//
+//	    // Remove roles not present in newRoles
+//	    logger.info("Removing roles not present in newRoles for user: {}", userName);
+//	    for (UserRole userRole : rolesToRemove) {
+//	        user.removeUserRole(userRole); // Remove from user's collection
+//	        userRole.setUser(null); // Disassociate from user
+//	        userRoleDao.delete(userRole); // Delete from database
+//	        logger.info("Removed UserRole: {}", userRole);
+//	    }
+//
+//	    // Save changes to the database to ensure roles are removed
+//	    userRoleDao.flush();
+//	    userDao.flush(); // Ensure that deletions are flushed to the database
+//
+//	    // Add new roles
+//	    logger.info("Adding new roles for user: {}", userName);
+//	    for (Role role : newRoles) {
+//	        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
+//	            user.addRole(role);
+//	            logger.info("Role added: {}", role);
+//	        }
+//	    }
+//
+//	    // Save updated user
+//	    userDao.save(user);
+//	    logger.info("User updated successfully: {}", userName);
+//
+//	    return new ReqRes(200, null, "User updated successfully");
+//	}
+	
 	@Transactional
 	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
 	    logger.info("Updating user with username: {}", userName);
@@ -348,16 +416,8 @@ public class UserService {
 
 	    // Remove roles not present in newRoles
 	    logger.info("Removing roles not present in newRoles for user: {}", userName);
-	    for (UserRole userRole : rolesToRemove) {
-	        user.removeUserRole(userRole); // Remove from user's collection
-	        userRole.setUser(null); // Disassociate from user
-	        userRoleDao.delete(userRole); // Delete from database
-	        logger.info("Removed UserRole: {}", userRole);
-	    }
-
-	    // Save changes to the database to ensure roles are removed
-	    userRoleDao.flush();
-	    userDao.flush(); // Ensure that deletions are flushed to the database
+	    user.getUserRoles().removeAll(rolesToRemove);
+	    userRoleDao.deleteAll(rolesToRemove);
 
 	    // Add new roles
 	    logger.info("Adding new roles for user: {}", userName);
@@ -513,13 +573,13 @@ public class UserService {
 	}
 
 	public UserDTO getUserByUsername(String username) {
-		Optional<User> optionalUser = userDao.findByUserName(username);
-		if (optionalUser.isPresent()) {
-			User user = optionalUser.get();
-			return mapToUserDTO(user);
-		}
-		return null;
-	}
+        try {
+            return userDao.findUserDetailsWithRolesByUsername(username);
+        } catch (Exception e) {
+            // Log the exception or handle it as needed
+            return null; // Return null in case of an error
+        }
+    }
 
 	public UserDTO mapToUserDTO(User user) {
 		UserDTO userDTO = new UserDTO();
@@ -528,7 +588,6 @@ public class UserService {
 		userDTO.setUserRid(user.getUserRid());
 		userDTO.setUserLastName(user.getUserLastName());
 		userDTO.setUserEmail(user.getUserEmail());
-		userDTO.setUserEmployeeId(user.getUserEmployeeId());
 		userDTO.setRoles(user.getRoles().stream().map(this::mapToRoleDTO).collect(Collectors.toList()));
 		return userDTO;
 	}

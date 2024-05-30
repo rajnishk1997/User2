@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.optum.dto.UserDTO;
 import com.optum.dto.UserInfo;
 import com.optum.entity.User;
 
@@ -19,9 +20,9 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 
 	Optional<User> findByUserRid(Integer userId);
 
-	 @Query("SELECT new com.optum.dto.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser) " +
-	           "FROM User u WHERE u.isNewUser = true")
-	    List<UserInfo> findNewUsers();
+	@Query("SELECT new com.optum.dto.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser) "
+			+ "FROM User u WHERE u.isNewUser = true")
+	List<UserInfo> findNewUsers();
 
 	User findByUserNameAndIsNewUserTrue(String userName);
 
@@ -38,4 +39,8 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 			+ "LOWER(u.userLastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
 			+ "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))")
 	List<UserInfo> searchUsersByKeywordWithoutRoles(@Param("keyword") String keyword);
+
+	@Query("SELECT new com.optum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.userEmail, u.userRid) "
+			+ "FROM User u JOIN u.userRoles ur JOIN ur.role r WHERE u.userName = :username")
+	UserDTO findUserDetailsWithRolesByUsername(@Param("username") String username);
 }
