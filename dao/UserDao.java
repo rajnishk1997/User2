@@ -19,7 +19,9 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 
 	Optional<User> findByUserRid(Integer userId);
 
-	List<User> findByIsNewUserTrue();
+	 @Query("SELECT new com.optum.dto.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser) " +
+	           "FROM User u WHERE u.isNewUser = true")
+	    List<UserInfo> findNewUsers();
 
 	User findByUserNameAndIsNewUserTrue(String userName);
 

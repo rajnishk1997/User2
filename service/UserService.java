@@ -636,4 +636,13 @@ public class UserService {
 	        return userDao.save(user);
 	    }
 
+	 public List<UserInfo> getNewUsers() {
+        try {
+            return userDao.findNewUsers();
+        } catch (Exception e) {
+            // Log the exception or handle it as needed
+            return Collections.emptyList(); // Return an empty list in case of an error
+        }
+    }
+
 }

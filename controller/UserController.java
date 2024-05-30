@@ -114,11 +114,6 @@ public class UserController {
 	        } else {
 	            userList = userService.searchUsersByKeyword(keyword);
 	        }
-
-//	        List<UserInfo> userInfoList = userList.stream()
-//	                                              .map(userService::mapToUserInfo)
-//	                                              .collect(Collectors.toList());
-
 	        ReqRes reqRes;
 	        if (userList.isEmpty()) {
 	            reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
@@ -186,19 +181,16 @@ public class UserController {
 
 	  
 	@GetMapping("/newuser")
-	public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers() {
-	    try {
-	        List<User> newUsers = userDao.findByIsNewUserTrue();
-	        List<UserDTO> userDTOs = newUsers.stream()
-	                                          .map(user -> userService.mapToUserDTO(user))
-	                                          .collect(Collectors.toList());
-	        ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<>(userDTOs, new ReqRes(200, null, "Users retrieved successfully"));
-	        return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-	    } catch (Exception e) {
-	        ResponseWrapper<List<UserDTO>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
-	        return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
-	    }
-	}
+    public ResponseEntity<ResponseWrapper<List<UserInfo>>> getNewUsers() {
+        try {
+            List<UserInfo> newUsers = userService.getNewUsers();
+            ResponseWrapper<List<UserInfo>> responseWrapper = new ResponseWrapper<>(newUsers, new ReqRes(200, null, "Users retrieved successfully"));
+            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
+        } catch (Exception e) {
+            ResponseWrapper<List<UserInfo>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
+            return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 
 
 	@PostMapping("/accept/{userName}")
