@@ -2,6 +2,8 @@ package com.optum.service;
 
 import com.optum.entity.AuditTrail;
 import com.optum.dao.AuditTrailRepository;
+import com.optum.dao.UserDao;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +14,9 @@ import java.util.Date;
 
 @Service
 public class AuditTrailService {
+	
+	@Autowired
+	private UserDao userDao;
 
     @Autowired
     private AuditTrailRepository auditTrailRepository;
@@ -28,6 +33,12 @@ public class AuditTrailService {
     }
     
  
+    @Async
+    public void logAuditTrailWithUsername(String action, String status, String details, int userId) {
+        String currentUserUsername = userDao.findUserNameByUserRid(userId);
+        String detailedMessage = details + " by " + currentUserUsername;
+        logAuditTrail(action, status, detailedMessage, userId, new Date());
+    }
 
     public Page<AuditTrail> getAuditTrails(Pageable pageable) {
         return auditTrailRepository.findAllByOrderByTimestampDesc(pageable);
