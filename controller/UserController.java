@@ -75,34 +75,45 @@ public class UserController {
 	}
 
 
-    @PostMapping("/registerNewUser")
-    public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
-        int currentUserRid = userRequestDTO.getCurrentUserId(); 
-        long startTime = System.currentTimeMillis();
-        try {
-            RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
-            RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.CREATED.value(), "",
-                    "User registered successfully", registeredUser.getUserName(), registeredUser.getPassword());
-            
-            auditTrailService.logAuditTrail("registerNewUser", "SUCCESS", "User registered successfully", currentUserRid);
+	@PostMapping("/registerNewUser")
+	public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
+	    int currentUserRid = userRequestDTO.getCurrentUserId(); 
+	    long startTime = System.currentTimeMillis();
+	    try {
+	        RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
+	        
+	        // Prepare audit trail details
+	        String details = String.format("Username: %s, Password: %s, Roles: %s, Email: %s",
+	                registeredUser.getUserName(),
+	                registeredUser.getPassword(),
+	                userRequestDTO.getRoles().toString(),
+	                userRequestDTO.getUserEmail());
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
-            RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request", e.getMessage(), null, null);
-            auditTrailService.logAuditTrail("registerNewUser", "FAILURE", e.getMessage(), currentUserRid);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (Exception e) {
-            RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    "Internal Server Error", "An error occurred while registering the user", null, null);
-            auditTrailService.logAuditTrail("registerNewUser", "FAILURE", "An error occurred while registering the user", currentUserRid);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        } finally {
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-           logger.info("Action performed in " + duration + "ms");
-        }
-    }
+	        // Log audit trail asynchronously
+	        auditTrailService.logAuditTrail("User Created", "SUCCESS", details, currentUserRid, new Date());
+
+	        // Create and return the registration response
+	        RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.CREATED.value(), "",
+	                "User registered successfully", registeredUser.getUserName(), registeredUser.getPassword());
+
+	        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+	    } catch (IllegalArgumentException e) {
+	        RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.BAD_REQUEST.value(),
+	                "Bad Request", e.getMessage(), null, null);
+	        auditTrailService.logAuditTrail("User Created", "FAILURE", e.getMessage(), currentUserRid, new Date());
+	        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+	    } catch (Exception e) {
+	        RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+	                "Internal Server Error", "An error occurred while registering the user", null, null);
+	        auditTrailService.logAuditTrail("User Created", "FAILURE", "An error occurred while registering the user", currentUserRid, new Date());
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+	    } finally {
+	        long endTime = System.currentTimeMillis();
+	        long duration = endTime - startTime;
+	        logger.info("User Creation Action performed in " + duration + "ms");
+	    }
+	}
+
 	// Method to match useCases:
 	
 	@GetMapping("/search")
@@ -138,14 +149,14 @@ public class UserController {
         try {
             ReqRes response = userService.updateUser(userName, userRequestDTO);
             if (response.getStatusCode() == 200) {
-                auditTrailService.logAuditTrail("updateUser", "SUCCESS", "User updated successfully", currentUserRid);
+                auditTrailService.logAuditTrail("updateUser", "SUCCESS", "User updated successfully", currentUserRid, new Date());
                 return ResponseEntity.ok(response);
             } else {
-                auditTrailService.logAuditTrail("updateUser", "FAILURE", "Failed to update user: " + response.getMessage(), currentUserRid);
+                auditTrailService.logAuditTrail("updateUser", "FAILURE", "Failed to update user: " + response.getMessage(), currentUserRid, new Date());
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
         } catch (Exception e) {
-            auditTrailService.logAuditTrail("updateUser", "FAILURE", "An error occurred while updating the user", currentUserRid);
+            auditTrailService.logAuditTrail("updateUser", "FAILURE", "An error occurred while updating the user", currentUserRid, new Date());
             ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while updating the user");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         } finally {
@@ -155,29 +166,36 @@ public class UserController {
         }
     }
 	
-	@DeleteMapping("/delete/{userName}")
-    public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName,@RequestBody UserRequestDTO userRequestDTO) {
-		int currentUserRid = userRequestDTO.getCurrentUserId(); 
-        long startTime = System.currentTimeMillis();
-        try {
-            ReqRes response = userService.deleteUserByUserName(userName);
-            if (response.getStatusCode() == 200) {
-                auditTrailService.logAuditTrail("deleteUser", "SUCCESS", "User deleted successfully", currentUserRid);
-                return ResponseEntity.ok(response);
-            } else {
-                auditTrailService.logAuditTrail("deleteUser", "FAILURE", "Failed to delete user: " + response.getMessage(), currentUserRid);
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-        } catch (Exception e) {
-            auditTrailService.logAuditTrail("deleteUser", "FAILURE", "An error occurred while deleting the user", currentUserRid);
-            ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        } finally {
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-            logger.info("Action performed in " + duration + "ms");
-        }
-    }
+	 @DeleteMapping("/delete/{userName}")
+	    public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+	        int currentUserRid = userRequestDTO.getCurrentUserId(); 
+	        long startTime = System.currentTimeMillis();
+	        try {
+	            // Fetch the username of the user performing the deletion
+	            String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
+
+	            ReqRes response = userService.deleteUserByUserName(userName);
+	            if (response.getStatusCode() == 200) {
+	                String details = String.format("Deleted User: %s, Deleted By: %s", userName, currentUserUsername);
+	                auditTrailService.logAuditTrail("deleteUser", "SUCCESS", details, currentUserRid, new Date());
+	                return ResponseEntity.ok(response);
+	            } else {
+	                String details = String.format("Failed to delete User: %s, Attempted By: %s. Reason: %s", userName, currentUserUsername, response.getMessage());
+	                auditTrailService.logAuditTrail("deleteUser", "FAILURE", details, currentUserRid, new Date());
+	                return ResponseEntity.status(response.getStatusCode()).body(response);
+	            }
+	        } catch (Exception e) {
+	            String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
+	            String details = String.format("Error occurred while deleting User: %s, Attempted By: %s", userName, currentUserUsername);
+	            auditTrailService.logAuditTrail("deleteUser", "FAILURE", details, currentUserRid, new Date());
+	            ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
+	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+	        } finally {
+	            long endTime = System.currentTimeMillis();
+	            long duration = endTime - startTime;
+	            logger.info("Deletion Action performed in " + duration + "ms");
+	        }
+	    }
 
 	  
 	@GetMapping("/newuser")
@@ -209,23 +227,23 @@ public class UserController {
 	             //   changePasswordRequest.setCurrentUserId(currentUserRid);
 
 	                ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(changePasswordRequest, reqRes);
-	                auditTrailService.logAuditTrail("acceptNewUser", "SUCCESS", "User accepted successfully", currentUserRid);
+	                auditTrailService.logAuditTrail("acceptNewUser", "SUCCESS", "User accepted successfully", currentUserRid, new Date());
 	                return ResponseEntity.ok(responseWrapper);
 	            } else {
 	                ReqRes notFoundRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "User not found after acceptance");
 	                ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, notFoundRes);
-	                auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", notFoundRes.getMessage(), currentUserRid);
+	                auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", notFoundRes.getMessage(), currentUserRid, new Date());
 	                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
 	            }
 	        } else {
 	            ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, reqRes);
-	            auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", reqRes.getMessage(), currentUserRid);
+	            auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", reqRes.getMessage(), currentUserRid, new Date());
 	            return ResponseEntity.status(reqRes.getStatusCode()).body(responseWrapper);
 	        }
 	    } catch (Exception e) {
 	        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while accepting the user");
 	        ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, reqRes);
-	        auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "An error occurred while accepting the user", currentUserRid);
+	        auditTrailService.logAuditTrail("acceptNewUser", "FAILURE", "An error occurred while accepting the user", currentUserRid, new Date());
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseWrapper);
 	    } finally {
 	        long endTime = System.currentTimeMillis();
@@ -261,14 +279,14 @@ public class UserController {
         try {
             ReqRes response = userService.deactivateUser(userName);
             if (response.getStatusCode() == 200) {
-                auditTrailService.logAuditTrail("deactivateUser", "SUCCESS", "User deactivated successfully", currentUserRid);
+                auditTrailService.logAuditTrail("deactivateUser", "SUCCESS", "User deactivated successfully", currentUserRid, new Date());
                 return ResponseEntity.ok(response);
             } else {
-                auditTrailService.logAuditTrail("deactivateUser", "FAILURE", "Failed to deactivate user: " + response.getMessage(), currentUserRid);
+                auditTrailService.logAuditTrail("deactivateUser", "FAILURE", "Failed to deactivate user: " + response.getMessage(), currentUserRid, new Date());
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
         } catch (Exception e) {
-            auditTrailService.logAuditTrail("deactivateUser", "FAILURE", "An error occurred while deactivating the user", currentUserRid);
+            auditTrailService.logAuditTrail("deactivateUser", "FAILURE", "An error occurred while deactivating the user", currentUserRid, new Date());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the user"));
         } finally {
@@ -285,10 +303,10 @@ public class UserController {
         long startTime = System.currentTimeMillis();
         try {
             userService.changePassword(request.getUsername(), request.getNewPassword());
-            auditTrailService.logAuditTrail("changePassword", "SUCCESS", "Password changed successfully for username: " + request.getUsername(), currentUserRid);
+            auditTrailService.logAuditTrail("changePassword", "SUCCESS", "Password changed successfully for username: " + request.getUsername(), currentUserRid, new Date());
             return ResponseEntity.ok("Password changed successfully");
         } catch (RuntimeException e) {
-            auditTrailService.logAuditTrail("changePassword", "FAILURE", "Failed to change password for username: " + request.getUsername() + ". Error: " + e.getMessage(), currentUserRid);
+            auditTrailService.logAuditTrail("changePassword", "FAILURE", "Failed to change password for username: " + request.getUsername() + ". Error: " + e.getMessage(), currentUserRid, new Date());
             return ResponseEntity.badRequest().body(e.getMessage());
         } finally {
             long endTime = System.currentTimeMillis();

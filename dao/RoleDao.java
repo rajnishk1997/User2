@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.optum.entity.Role;
@@ -16,7 +18,9 @@ public interface RoleDao extends JpaRepository<Role, Integer> {
 	 Optional<Role> findByRoleName(String roleName);
 	 //Role findByName(String roleName);
 
-	Optional<Role> findByRoleRid(int id);
+	 @Query("SELECT r FROM Role r WHERE r.roleRid = :id")
+	    Optional<Role> findByRoleRid(@Param("id") int id);
+	
 
 	 List<Role> findByRoleNameIn(Set<String> roleNames);
 }

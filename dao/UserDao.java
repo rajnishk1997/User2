@@ -14,11 +14,16 @@ import com.optum.entity.User;
 
 @Repository
 public interface UserDao extends JpaRepository<User, Integer>, CustomUserRepository {
+	
+	 @Query("SELECT u FROM User u WHERE u.userName = :userName")
 	Optional<User> findByUserName(String userName);
 
 	boolean existsByUserEmail(String userEmail);
 
 	Optional<User> findByUserRid(Integer userId);
+	
+	 @Query("SELECT u.userName FROM User u WHERE u.userRid = :userRid")
+	    String findUserNameByUserRid(@Param("userRid") int userRid);
 
 	@Query("SELECT new com.optum.dto.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser) "
 			+ "FROM User u WHERE u.isNewUser = true")
