@@ -33,6 +33,7 @@ import com.optum.dto.UserInfo;
 import com.optum.dto.request.UserRequestDTO;
 import com.optum.entity.*;
 import com.optum.service.AuditTrailService;
+import com.optum.service.RoleService;
 import com.optum.service.UserService;
 
 import java.util.Collection;
@@ -41,6 +42,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -53,6 +55,9 @@ public class UserController {
 
 	@Autowired
 	private UserService userService;
+	
+	@Autowired
+	private RoleService roleService;
 	
 	@Autowired
 	private UserDao userDao;
@@ -82,15 +87,18 @@ public class UserController {
 	    try {
 	        RegistrationResponse<User> registeredUser = userService.registerNewUser(userRequestDTO);
 	        
-	        // Prepare audit trail details
-	        String details = String.format("Username: %s, Password: %s, Roles: %s, Email: %s",
+	        // Log audit trail asynchronously
+	        CompletableFuture.runAsync(() -> {
+	            String roleNames = RoleService.extractRoleNames(userRequestDTO.getRoles());
+	            String details = String.format(
+	                "Username: %s, Password: %s, Roles: %s, Email: %s",
 	                registeredUser.getUserName(),
 	                registeredUser.getPassword(),
-	                userRequestDTO.getRoles().toString(),
-	                userRequestDTO.getUserEmail());
-
-	        // Log audit trail asynchronously
-	        auditTrailService.logAuditTrailWithUsername("User Created", "SUCCESS", details, currentUserRid);
+	                roleNames,
+	                userRequestDTO.getUserEmail()
+	            );
+	            auditTrailService.logAuditTrailWithUsername("User Created", "SUCCESS", details, currentUserRid);
+	        });
 
 	        // Create and return the registration response
 	        RegistrationResponse<User> response = new RegistrationResponse<>(HttpStatus.CREATED.value(), "",
@@ -108,9 +116,10 @@ public class UserController {
 	    } finally {
 	        long endTime = System.currentTimeMillis();
 	        long duration = endTime - startTime;
-	        logger.info("User Creation Action performed in " + duration + "ms");
+	        logger.info("Action performed in " + duration + "ms");
 	    }
 	}
+
 
 	// Method to match useCases:
 	
@@ -140,27 +149,37 @@ public class UserController {
 	
 	
 	@PutMapping("/update/{userName}")
-    public ResponseEntity<ReqRes> updateUser(@PathVariable String userName,
-                                             @RequestBody UserRequestDTO userRequestDTO) {
-		int currentUserRid = userRequestDTO.getCurrentUserId(); 
-        long startTime = System.currentTimeMillis();
-        try {
-            ReqRes response = userService.updateUser(userName, userRequestDTO);
-            if (response.getStatusCode() == 200) {
-                auditTrailService.logAuditTrailWithUsername("updateUser", "SUCCESS", "User updated successfully", currentUserRid);
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-        } catch (Exception e) {
-            ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while updating the user");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        } finally {
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-            logger.info("Action performed in " + duration + "ms");
-        }
-    }
+	public ResponseEntity<ReqRes> updateUser(@PathVariable String userName,
+	                                         @RequestBody UserRequestDTO userRequestDTO) {
+	    int currentUserRid = userRequestDTO.getCurrentUserId();
+	    long startTime = System.currentTimeMillis();
+	    try {
+	        ReqRes response = userService.updateUser(userName, userRequestDTO);
+	        if (response.getStatusCode() == 200) {
+	            CompletableFuture.runAsync(() -> {
+	                try {
+	                    String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
+	                    String details = userService.generateAuditTrailDetails(userName, userRequestDTO);
+	                    auditTrailService.logAuditTrailWithUsername("updateUser", "SUCCESS", details, currentUserRid);
+	                } catch (Exception e) {
+	                    logger.error("Failed to log audit trail for updateUser action", e);
+	                }
+	            });
+	            return ResponseEntity.ok(response);
+	        } else {
+	            return ResponseEntity.status(response.getStatusCode()).body(response);
+	        }
+	    } catch (Exception e) {
+	        ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while updating the user");
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+	    } finally {
+	        long endTime = System.currentTimeMillis();
+	        long duration = endTime - startTime;
+	        logger.info("Action performed in " + duration + "ms");
+	    }
+	}
+
+
 	
 	 @DeleteMapping("/delete/{userName}")
 	    public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {

@@ -375,6 +375,41 @@ public class UserService {
 //	    return new ReqRes(200, null, "User updated successfully");
 //	}
 	
+	public String generateAuditTrailDetails(String userName, UserRequestDTO userRequestDTO) {
+	    Optional<User> optionalUser = userDao.findByUserName(userName);
+	    if (!optionalUser.isPresent()) {
+	        return "User not found";
+	    }
+
+	    User user = optionalUser.get();
+	    StringBuilder details = new StringBuilder();
+
+	    // Check and log changes for each field
+	    if (!user.getUserFirstName().equals(userRequestDTO.getUserFirstName())) {
+	        details.append(String.format("Old First Name: %s, New First Name: %s; ", user.getUserFirstName(), userRequestDTO.getUserFirstName()));
+	    }
+	    if (!user.getUserLastName().equals(userRequestDTO.getUserLastName())) {
+	        details.append(String.format("Old Last Name: %s, New Last Name: %s; ", user.getUserLastName(), userRequestDTO.getUserLastName()));
+	    }
+	    if (!user.getUserEmail().equals(userRequestDTO.getUserEmail())) {
+	        details.append(String.format("Old Email: %s, New Email: %s; ", user.getUserEmail(), userRequestDTO.getUserEmail()));
+	    }
+
+	    // Extract old and new roles
+	    Set<String> oldRoles = user.getUserRoles().stream()
+	                               .map(userRole -> userRole.getRole().getRoleName())
+	                               .collect(Collectors.toSet());
+	    Set<String> newRoles = userRequestDTO.getRoles().stream()
+	                                         .map(RoleDTO::getRoleName)
+	                                         .collect(Collectors.toSet());
+
+	    if (!oldRoles.equals(newRoles)) {
+	        details.append(String.format("Old Roles: %s, New Roles: %s; ", String.join(", ", oldRoles), String.join(", ", newRoles)));
+	    }
+
+	    return details.toString();
+	}
+
 	@Transactional
 	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
 	    logger.info("Updating user with username: {}", userName);
@@ -416,8 +451,16 @@ public class UserService {
 
 	    // Remove roles not present in newRoles
 	    logger.info("Removing roles not present in newRoles for user: {}", userName);
-	    user.getUserRoles().removeAll(rolesToRemove);
-	    userRoleDao.deleteAll(rolesToRemove);
+	    for (UserRole userRole : rolesToRemove) {
+	        user.removeUserRole(userRole); // Remove from user's collection
+	        userRole.setUser(null); // Disassociate from user
+	        userRoleDao.delete(userRole); // Delete from database
+	        logger.info("Removed UserRole: {}", userRole);
+	    }
+
+	    // Save changes to the database to ensure roles are removed
+	    userRoleDao.flush();
+	    userDao.flush(); // Ensure that deletions are flushed to the database
 
 	    // Add new roles
 	    logger.info("Adding new roles for user: {}", userName);
@@ -434,7 +477,8 @@ public class UserService {
 
 	    return new ReqRes(200, null, "User updated successfully");
 	}
-
+	
+	
 	public Optional<User> updateUserByUserId(Integer userId, User updatedUser) {
 		Optional<User> optionalUser = userDao.findByUserRid(userId);
 		if (optionalUser.isPresent()) {

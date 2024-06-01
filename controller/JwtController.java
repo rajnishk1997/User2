@@ -1,5 +1,7 @@
 package com.optum.controller;
 
+import java.sql.Date;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,14 +39,13 @@ public class JwtController {
         try {
             JwtResponse customJwtResponse = jwtService.createJwtToken(jwtRequest);
             currentUserRid = customJwtResponse.getCurrentUserId();
-            auditTrailService.logAuditTrail("createJwtToken", "SUCCESS", "JWT token created successfully for username: " + jwtRequest.getUserName(), currentUserRid);
+            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "JWT token created successfully for username: " + jwtRequest.getUserName(), currentUserRid);
             return ResponseEntity.ok(customJwtResponse);
         } catch (BadCredentialsException e) {
-            auditTrailService.logAuditTrail("createJwtToken", "FAILURE", "Invalid credentials for username: " + jwtRequest.getUserName(), currentUserRid);
+           
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null));
         } catch (Exception e) {
-            auditTrailService.logAuditTrail("createJwtToken", "FAILURE", "Something went wrong for username: " + jwtRequest.getUserName(), currentUserRid);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new JwtResponse(500, "Internal Server Error", "Something went wrong", null, null, null));
         } finally {

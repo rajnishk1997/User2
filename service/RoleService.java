@@ -1,6 +1,7 @@
 package com.optum.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
@@ -46,5 +47,11 @@ public class RoleService {
         return roleRepository.findAll().stream()
                              .map(role -> new RoleInfo(role.getRoleRid(), role.getRoleName()))
                              .collect(Collectors.toList());
+    }
+    
+    public static String extractRoleNames(Set<RoleDTO> roles) {
+        return roles.stream()
+                    .map(RoleDTO::getRoleName) // Adjust this method call to match your RoleDTO
+                    .collect(Collectors.joining(", "));
     }
 }
