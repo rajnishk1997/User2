@@ -39,7 +39,7 @@ public class JwtController {
         try {
             JwtResponse customJwtResponse = jwtService.createJwtToken(jwtRequest);
             currentUserRid = customJwtResponse.getCurrentUserId();
-            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "JWT token created successfully for username: " + jwtRequest.getUserName(), currentUserRid);
+            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + jwtRequest.getUserName(), currentUserRid);
             return ResponseEntity.ok(customJwtResponse);
         } catch (BadCredentialsException e) {
            

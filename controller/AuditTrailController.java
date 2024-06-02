@@ -19,7 +19,8 @@ public class AuditTrailController {
 
     @Autowired
     private AuditTrailService auditTrailService;
-
+    
+    @GetMapping("/log")
     public ResponseEntity<ResponseWrapper<Page<AuditTrail>>> getAuditTrails(
             @RequestParam(defaultValue = "0") int page) {
         int size = 10; // Fixed page size

@@ -736,6 +736,18 @@ public class UserService {
 	        Optional<User> userOptional = userDao.findByUserName(username);
 	        User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
 	        user.setUserPassword(passwordEncoder.encode(newPassword));
+	       // user.setFirstLogin(false);
+	       // user.setUserPlainPassword(null);
+	        return userDao.save(user);
+	    }
+	 
+	 @Transactional
+	    public User firstLoginChangePassword(String username, String newPassword) {
+	        Optional<User> userOptional = userDao.findByUserName(username);
+	        User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
+	        user.setUserPassword(passwordEncoder.encode(newPassword));
+	        user.setFirstLogin(false);
+	        user.setUserPlainPassword(null);
 	        return userDao.save(user);
 	    }
 
@@ -755,11 +767,18 @@ public class UserService {
 	            User user = optionalUser.get();
 	            user.setNewUser(false);
 	            user.setActiveUser(true);
+	            user.setFirstLogin(true);  // Mark as first login
 	            userDao.save(user);
 	            return new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
 	        } else {
 	            return new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username");
 	        }
+	    }
+	  
+	  public void changePassword(User user, String newPassword) {
+	        user.setUserPassword(passwordEncoder.encode(newPassword));
+	        user.setFirstLogin(false);
+	        userDao.save(user);
 	    }
 
 }

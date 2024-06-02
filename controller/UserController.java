@@ -314,8 +314,8 @@ public class UserController {
 
     
     @PostMapping("/change-password")
-    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request, @RequestBody UserRequestDTO userRequestDTO) {
-        Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
+    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request) {
+        Integer currentUserRid = request.getCurrentUserId();
         long startTime = System.currentTimeMillis();
         try {
             userService.changePassword(request.getUsername(), request.getNewPassword());
@@ -323,16 +323,32 @@ public class UserController {
             auditTrailService.logAuditTrailWithUsername("changePassword", "SUCCESS", details, currentUserRid);
             return ResponseEntity.ok("Password changed successfully");
         } catch (RuntimeException e) {
-            String details = "Failed to change password for username: " + request.getUsername() + ". Error: " + e.getMessage();
-          //  auditTrailService.logAuditTrailWithUsername("changePassword", "FAILURE", details, currentUserRid);
             return ResponseEntity.badRequest().body(e.getMessage());
         } finally {
             long endTime = System.currentTimeMillis();
             long duration = endTime - startTime;
-            logger.info("Action performed in " + duration + "ms");
+            logger.info("Update Password Action performed in " + duration + "ms");
         }
     }
-
+    
+    @PostMapping("/firstlogin-change-password")
+    public ResponseEntity<String> firstLoginChangePassword(@RequestBody ChangePasswordRequest request) {
+        Integer currentUserRid = request.getCurrentUserId();
+        long startTime = System.currentTimeMillis();
+        try {
+            userService.firstLoginChangePassword(request.getUsername(), request.getNewPassword());
+            String details = "First Time Password changed successfully for username: " + request.getUsername();
+            auditTrailService.logAuditTrailWithUsername("First Time Change Password", "SUCCESS", details, currentUserRid);
+            return ResponseEntity.ok("Password changed successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("First Login Change Password Action performed in " + duration + "ms");
+        }
+    }
+    
 
 	@GetMapping({ "/forAdmin" })
 	@PreAuthorize("hasRole('Admin')")
