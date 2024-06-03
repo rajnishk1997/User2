@@ -20,5 +20,7 @@ public class RoleInfo {
 			this.roleRid = roleRid;
 			this.roleName = roleName;
 		}
+		
+		
 	    
 }

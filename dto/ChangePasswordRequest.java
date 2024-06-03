@@ -4,34 +4,25 @@ public class ChangePasswordRequest {
     private String userName;
     private String userPassword;
     private Integer currentUserId;
-
-    // Getters and setters
-    public String getUsername() {
-        return userName;
-    }
-
-    public void setUsername(String username) {
-        this.userName = username;
-    }
-
-    public String getNewPassword() {
-        return userPassword;
-    }
-
-    public void setNewPassword(String newPassword) {
-        this.userPassword = newPassword;
-    }
-
+	public String getUserName() {
+		return userName;
+	}
+	public void setUserName(String userName) {
+		this.userName = userName;
+	}
+	public String getUserPassword() {
+		return userPassword;
+	}
+	public void setUserPassword(String userPassword) {
+		this.userPassword = userPassword;
+	}
 	public Integer getCurrentUserId() {
 		return currentUserId;
 	}
-
 	public void setCurrentUserId(Integer currentUserId) {
 		this.currentUserId = currentUserId;
 	}
-    
-    
-    
+
     
 }
 

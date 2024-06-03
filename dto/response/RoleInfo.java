@@ -1,11 +1,13 @@
 package com.optum.dto.response;
 
+import java.util.HashSet;
 import java.util.Set;
 
 public class RoleInfo {
     private Integer roleRid;
     private String roleName;
     private Set<PermissionInfo> permissions;
+	
 	public Integer getRoleRid() {
 		return roleRid;
 	}
@@ -25,5 +27,9 @@ public class RoleInfo {
 		this.permissions = permissions;
 	}
 
-   
+	 public RoleInfo(int roleRid, String roleName) {
+	        this.roleRid = roleRid;
+	        this.roleName = roleName;
+	        this.permissions = new HashSet<>();
+	    }
 }
