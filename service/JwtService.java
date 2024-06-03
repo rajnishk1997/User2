@@ -35,101 +35,57 @@ public class JwtService implements UserDetailsService {
 
     @Autowired
     private JwtUtil jwtUtil;
-    
-    @Autowired
-    private RolePermissionDao rolePermissionRepository;
 
     @Autowired
     private UserDao userDao;
     
-    @Autowired
-    private PermissionDao permissionRepository;
 
     @Autowired
     private AuthenticationManager authenticationManager;
 
-    public JwtResponse createJwtToken(JwtRequest jwtRequest) {
-        try {
-            String userName = jwtRequest.getUserName();
-            String userPassword = jwtRequest.getUserPassword();
-            try {
-                authenticate(userName, userPassword);
-            } catch (BadCredentialsException e) {
-                return new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null);
+    public JwtResponse createJwtToken(JwtRequest jwtRequest) throws BadCredentialsException, UsernameNotFoundException {
+        String userName = jwtRequest.getUserName();
+        String userPassword = jwtRequest.getUserPassword();
+        authenticate(userName, userPassword);
+
+        UserDetails userDetails = loadUserByUsername(userName);
+        String newGeneratedToken = jwtUtil.generateToken(userDetails);
+
+        User user = userDao.findByUserName(userName).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        Set<RoleInfo> roleInfos = new HashSet<>();
+        user.getUserRoles().size();
+
+        for (UserRole userRole : user.getUserRoles()) {
+            Role role = userRole.getRole();
+            RoleInfo roleInfo = new RoleInfo();
+            roleInfo.setRoleRid(role.getRoleRid());
+            roleInfo.setRoleName(role.getRoleName());
+
+            Set<PermissionInfo> permissionInfos = new HashSet<>();
+            role.getRolePermissions().size();
+
+            for (RolePermission rolePermission : role.getRolePermissions()) {
+                Permission permission = rolePermission.getPermission();
+                PermissionInfo permissionInfo = new PermissionInfo();
+                permissionInfo.setPermissionRid(permission.getPermissionRid());
+                permissionInfo.setPermissionName(permission.getPermissionName());
+                permissionInfos.add(permissionInfo);
             }
-
-            UserDetails userDetails = loadUserByUsername(userName);
-            String newGeneratedToken = jwtUtil.generateToken(userDetails);
-            
-            User user = userDao.findByUserName(userName).orElseThrow(() -> new RuntimeException("User not found"));
-
-            // Initialize sets for role infos and permission infos
-            Set<RoleInfo> roleInfos = new HashSet<>();
-
-            // Eagerly fetch user roles along with user data
-            user.getUserRoles().size();
-            
-            // Iterate over user's roles
-            for (UserRole userRole : user.getUserRoles()) {
-                Role role = userRole.getRole();
-
-                // Initialize role info
-                RoleInfo roleInfo = new RoleInfo();
-                roleInfo.setRoleRid(role.getRoleRid());
-                roleInfo.setRoleName(role.getRoleName());
-
-                // Initialize set for permission infos
-                Set<PermissionInfo> permissionInfos = new HashSet<>();
-
-                // Eagerly fetch role permissions along with role data
-                role.getRolePermissions().size();
-
-                // Iterate over role's permissions
-                for (RolePermission rolePermission : role.getRolePermissions()) {
-                    Permission permission = rolePermission.getPermission();
-
-                    // Initialize permission info
-                    PermissionInfo permissionInfo = new PermissionInfo();
-                    permissionInfo.setPermissionRid(permission.getPermissionRid());
-                    permissionInfo.setPermissionName(permission.getPermissionName());
-
-                    // Add permission info to set
-                    permissionInfos.add(permissionInfo);
-                }
-
-                // Set permissions for role
-                roleInfo.setPermissions(permissionInfos);
-
-                // Add role info to set
-                roleInfos.add(roleInfo);
-            }
-
-            return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
-        } catch (BadCredentialsException e) {
-            return new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null);
-        } catch (Exception e) {
-            return new JwtResponse(500, "Internal Server Error", "Something went wrong", null, null, null);
+            roleInfo.setPermissions(permissionInfos);
+            roleInfos.add(roleInfo);
         }
+
+        return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
     }
-
-
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userDao.findByUserName(username).get();
-
-        if (user != null) {
-            return new org.springframework.security.core.userdetails.User(
-                    user.getUserName(),
-                    user.getUserPassword(),
-                    getAuthority(user)
-            );
-        } else {
-            throw new UsernameNotFoundException("User not found with username: " + username);
-        }
+        User user = userDao.findByUserName(username).orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+        return new org.springframework.security.core.userdetails.User(user.getUserName(), user.getUserPassword(), getAuthority(user));
     }
 
-    private Set getAuthority(User user) {
+    private Set<SimpleGrantedAuthority> getAuthority(User user) {
         Set<SimpleGrantedAuthority> authorities = new HashSet<>();
         user.getRoles().forEach(role -> {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleName()));
@@ -137,13 +93,13 @@ public class JwtService implements UserDetailsService {
         return authorities;
     }
 
-    private void authenticate(String userName, String userPassword) throws Exception {
+    private void authenticate(String userName, String userPassword) throws BadCredentialsException {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userName, userPassword));
         } catch (DisabledException e) {
-            throw new Exception("USER_DISABLED", e);
+            throw new DisabledException("USER_DISABLED", e);
         } catch (BadCredentialsException e) {
-            throw new Exception("INVALID_CREDENTIALS", e);
+            throw new BadCredentialsException("INVALID_CREDENTIALS", e);
         }
     }
 }

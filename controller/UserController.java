@@ -4,9 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,15 +16,10 @@ import java.util.Optional;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.modelmapper.ModelMapper;
 
 import com.optum.dao.ReqRes;
-import com.optum.dao.RoleDao;
-import com.optum.dao.RolePermissionDao;
 import com.optum.dao.UserDao;
-import com.optum.dao.UserRoleDao;
 import com.optum.dto.ChangePasswordRequest;
-import com.optum.dto.RoleDTO;
 import com.optum.dto.UserDTO;
 import com.optum.dto.UserInfo;
 import com.optum.dto.request.UserRequestDTO;
@@ -43,11 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
-import org.springframework.transaction.annotation.Transactional;
-
 @RestController
 public class UserController {
 	
@@ -56,8 +45,6 @@ public class UserController {
 	@Autowired
 	private UserService userService;
 	
-	@Autowired
-	private RoleService roleService;
 	
 	@Autowired
 	private UserDao userDao;
@@ -235,8 +222,8 @@ public class UserController {
 	                if (optionalUser.isPresent()) {
 	                    User user = optionalUser.get();
 	                    ChangePasswordRequest changePasswordRequest = new ChangePasswordRequest();
-	                    changePasswordRequest.setUsername(userName);
-	                    changePasswordRequest.setNewPassword(user.getUserPassword());
+	                    changePasswordRequest.setUserName(userName);
+	                    changePasswordRequest.setUserPassword(user.getUserPassword());
 	                    // changePasswordRequest.setCurrentUserId(currentUserRid);
 
 	                    ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(changePasswordRequest, reqRes);
@@ -246,7 +233,7 @@ public class UserController {
 	                } else {
 	                    ReqRes notFoundRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "User not found after acceptance");
 	                    ResponseWrapper<ChangePasswordRequest> responseWrapper = new ResponseWrapper<>(null, notFoundRes);
-	                    String details = String.format("Failed to find User: %s after acceptance, Attempted By: %s", userName, currentUserUsername);
+	                  
 	                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseWrapper);
 	                }
 	            } else {
@@ -295,14 +282,9 @@ public class UserController {
                 auditTrailService.logAuditTrailWithUsername("User Deactivate", "SUCCESS", details, currentUserRid);
                 return ResponseEntity.ok(response);
             } else {
-                String details = String.format("Failed to deactivate User: %s, Attempted By: %s. Reason: %s", userName, currentUserUsername, response.getMessage());
-             //   auditTrailService.logAuditTrail("User Deactivate", "FAILURE", details, currentUserRid, new Date());
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
         } catch (Exception e) {
-            String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
-            String details = String.format("Error occurred while deactivating User: %s, Attempted By: %s", userName, currentUserUsername);
-       //     auditTrailService.logAuditTrail("User Deactivate", "FAILURE", details, currentUserRid, new Date());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the user"));
         } finally {
@@ -318,8 +300,8 @@ public class UserController {
         Integer currentUserRid = request.getCurrentUserId();
         long startTime = System.currentTimeMillis();
         try {
-            userService.changePassword(request.getUsername(), request.getNewPassword());
-            String details = "Password changed successfully for username: " + request.getUsername();
+            userService.changePassword(request.getUserName(), request.getUserPassword());
+            String details = "Password changed successfully for username: " + request.getUserName();
             auditTrailService.logAuditTrailWithUsername("changePassword", "SUCCESS", details, currentUserRid);
             return ResponseEntity.ok("Password changed successfully");
         } catch (RuntimeException e) {
@@ -331,13 +313,13 @@ public class UserController {
         }
     }
     
-    @PostMapping("/firstlogin-change-password")
+    @PostMapping("/firstloginpassword")
     public ResponseEntity<String> firstLoginChangePassword(@RequestBody ChangePasswordRequest request) {
         Integer currentUserRid = request.getCurrentUserId();
         long startTime = System.currentTimeMillis();
         try {
-            userService.firstLoginChangePassword(request.getUsername(), request.getNewPassword());
-            String details = "First Time Password changed successfully for username: " + request.getUsername();
+            userService.firstLoginChangePassword(request.getUserName(), request.getUserPassword());
+            String details = "First Time Password changed successfully for username: " + request.getUserName();
             auditTrailService.logAuditTrailWithUsername("First Time Change Password", "SUCCESS", details, currentUserRid);
             return ResponseEntity.ok("Password changed successfully");
         } catch (RuntimeException e) {

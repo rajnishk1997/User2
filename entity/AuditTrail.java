@@ -10,7 +10,7 @@ public class AuditTrail {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "audit_rid")
-    private int id;
+    private Long id;
 
     @Column(name = "action")
     private String action;
@@ -29,11 +29,11 @@ public class AuditTrail {
 
     // Getters and setters
 
-    public int getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

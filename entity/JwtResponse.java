@@ -1,5 +1,6 @@
 package com.optum.entity;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.optum.dto.response.RoleInfo;
@@ -10,9 +11,10 @@ public class JwtResponse {
 	private int statusCode;
 	private String error;
 	private String message;
+	private boolean firstLogin;
 	private Integer currentUserId;
 	private String jwtToken;
-	private Set<RoleInfo> roleNames;
+	private Set<RoleInfo> roles;
 	private String userName;
 	private String userEmail;
 
@@ -31,56 +33,51 @@ public class JwtResponse {
 	}
 
 	public Set<RoleInfo> getRoleNames() {
-		return roleNames;
+		return roles;
 	}
 
 	public void setRoleNames(Set<RoleInfo> roleNames) {
-		this.roleNames = roleNames;
+		this.roles = roleNames;
 	}
 
-	public JwtResponse(int statusCode, String error, String message, String jwtToken, Set<RoleInfo> roleInfos,
-			User user) {
-		super();
-		this.statusCode = statusCode;
-		this.error = error;
-		this.message = message;
-		this.currentUserId = user.getUserRid();
-		this.jwtToken = jwtToken;
-		this.roleNames = roleInfos;
-		this.userName = user.getUserName();
-		this.userEmail = user.getUserEmail();
-
+//	public JwtResponse(int statusCode, String error, String message, String jwtToken, Set<RoleInfo> roleInfos,
+//			User user) {
+//		super();
+//		this.statusCode = statusCode;
+//		this.error = error;
+//		this.message = message;
+//		this.currentUserId = user.getUserRid();
+//		this.jwtToken = jwtToken;
+//		this.roleNames = roleInfos;
+//		this.userName = user.getUserName();
+//		this.userEmail = user.getUserEmail();
+//		this.firstLogin = user.isFirstLogin();
+//
+//	}
+	public JwtResponse(int statusCode, String message, String error, String jwtToken, Set<RoleInfo> roleInfos, User user) {
+	    this.statusCode = statusCode;
+	    this.message = message != null ? message : "";
+	    this.error = error != null ? error : "";
+	    this.jwtToken = jwtToken != null ? jwtToken : "";
+	    this.roles = roleInfos != null ? roleInfos : new HashSet<>();
+	    
+	    if (user != null) {
+	        this.userName = user.getUserName() != null ? user.getUserName() : "";
+	        this.userEmail = user.getUserEmail() != null ? user.getUserEmail() : "";
+	        this.firstLogin = user.isFirstLogin();
+	    } else {
+	        this.userName = "";
+	        this.userEmail = "";
+	    }
 	}
 
-//	public JwtResponse(int statusCode, String error, String message, String jwtToken,
-//		 Set<Role> roleNames, Set<Permission> permissions, User user) {
-//	super();
-//	this.statusCode = statusCode;
-//	this.error = error;
-//	this.message = message;
-//	this.jwtToken = jwtToken;
-//	this.roleNames = roleNames;
-//	this.permissions = permissions;
-//	this.userName = user.getUserName();
-//  this.userEmail = user.getUserEmail();
-//  this.currentUserRid=user.getUserRid();
-//}
+	public boolean isFirstLogin() {
+		return firstLogin;
+	}
 
-//	public Set<Role> getRoleNames() {
-//		return roleNames;
-//	}
-//
-//	public void setRoleNames(Set<Role> roleNames) {
-//		this.roleNames = roleNames;
-//	}
-//
-//	public Set<Permission> getPermissions() {
-//		return permissions;
-//	}
-//
-//	public void setPermissions(Set<Permission> permissions) {
-//		this.permissions = permissions;
-//	}
+	public void setFirstLogin(boolean firstLogin) {
+		this.firstLogin = firstLogin;
+	}
 
 	public void setStatusCode(int statusCode) {
 		this.statusCode = statusCode;

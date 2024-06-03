@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,25 +34,28 @@ public class JwtController {
     private AuditTrailService auditTrailService;
 
 	@PostMapping("/login")
-    public ResponseEntity<JwtResponse> createJwtToken(@RequestBody JwtRequest jwtRequest) {
-        long startTime = System.currentTimeMillis();
-        Integer currentUserRid = null;
-        try {
-            JwtResponse customJwtResponse = jwtService.createJwtToken(jwtRequest);
-            currentUserRid = customJwtResponse.getCurrentUserId();
-            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + jwtRequest.getUserName(), currentUserRid);
-            return ResponseEntity.ok(customJwtResponse);
-        } catch (BadCredentialsException e) {
-           
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new JwtResponse(500, "Internal Server Error", "Something went wrong", null, null, null));
-        } finally {
-            long endTime = System.currentTimeMillis();
-            long duration = endTime - startTime;
-            logger.info("Action performed in " + duration + "ms");
-        }
-    }
+	public ResponseEntity<JwtResponse> createJwtToken(@RequestBody JwtRequest jwtRequest) {
+	    long startTime = System.currentTimeMillis();
+	    Integer currentUserRid = null;
+	    try {
+	        JwtResponse customJwtResponse = jwtService.createJwtToken(jwtRequest);
+	        currentUserRid = customJwtResponse.getCurrentUserId();
+	        auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + jwtRequest.getUserName(), currentUserRid);
+	        return ResponseEntity.ok(customJwtResponse);
+	    } catch (BadCredentialsException e) {
+	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+	                .body(new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null));
+	    } catch (UsernameNotFoundException e) {
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                .body(new JwtResponse(404, "Not Found", "User not found", null, null, null));
+	    } catch (Exception e) {
+	        logger.error("Unexpected error occurred: ", e); // Log the exception for debugging
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                .body(new JwtResponse(500, "Internal Server Error", "Something went wrong", null, null, null));
+	    } finally {
+	        long endTime = System.currentTimeMillis();
+	        long duration = endTime - startTime;
+	        logger.info("Action performed in " + duration + "ms");
+	    }
+	}
 }

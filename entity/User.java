@@ -2,6 +2,7 @@ package com.optum.entity;
 
 import javax.persistence.*;
 
+
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
@@ -51,8 +52,19 @@ public class User {
     private String userPlainPassword; // New field for plain password
     private Integer currentUserId;
     private boolean isNewUser=true;
+    @Column(name = "u_first_login")
+    private boolean firstLogin = true;
+
     
-    public void addRole(Role role) {
+    public boolean isFirstLogin() {
+		return firstLogin;
+	}
+
+	public void setFirstLogin(boolean firstLogin) {
+		this.firstLogin = firstLogin;
+	}
+
+	public void addRole(Role role) {
         UserRole userRole = new UserRole(this, role);
         userRoles.add(userRole);
     }
@@ -276,12 +288,4 @@ public class User {
 	public void setModifiedDate(Date modifiedDate) {
 		this.modifiedDate = modifiedDate;
 	}
-	
-	
-	
-	
-
-    // Getters and setters
-    
-    
 }
