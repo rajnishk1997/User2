@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 
+import com.optum.audit.UserSnapshot;
 import com.optum.dao.PermissionDao;
 import com.optum.dao.ReqRes;
 import com.optum.dao.RoleDao;
@@ -375,36 +376,22 @@ public class UserService {
 //	    return new ReqRes(200, null, "User updated successfully");
 //	}
 	
-	public String generateAuditTrailDetails(String userName, UserRequestDTO userRequestDTO) {
-	    Optional<User> optionalUser = userDao.findByUserName(userName);
-	    if (!optionalUser.isPresent()) {
-	        return "User not found";
-	    }
-
-	    User user = optionalUser.get();
+	public String generateAuditTrailDetails(UserSnapshot oldState, UserSnapshot newState, UserRequestDTO userRequestDTO) {
 	    StringBuilder details = new StringBuilder();
 
 	    // Check and log changes for each field
-	    if (!user.getUserFirstName().equals(userRequestDTO.getUserFirstName())) {
-	        details.append(String.format("Old First Name: %s, New First Name: %s; ", user.getUserFirstName(), userRequestDTO.getUserFirstName()));
+	    if (!oldState.getFirstName().equals(newState.getFirstName())) {
+	        details.append(String.format("Old First Name: %s, New First Name: %s; ", oldState.getFirstName(), newState.getFirstName()));
 	    }
-	    if (!user.getUserLastName().equals(userRequestDTO.getUserLastName())) {
-	        details.append(String.format("Old Last Name: %s, New Last Name: %s; ", user.getUserLastName(), userRequestDTO.getUserLastName()));
+	    if (!oldState.getLastName().equals(newState.getLastName())) {
+	        details.append(String.format("Old Last Name: %s, New Last Name: %s; ", oldState.getLastName(), newState.getLastName()));
 	    }
-	    if (!user.getUserEmail().equals(userRequestDTO.getUserEmail())) {
-	        details.append(String.format("Old Email: %s, New Email: %s; ", user.getUserEmail(), userRequestDTO.getUserEmail()));
+	    if (!oldState.getEmail().equals(newState.getEmail())) {
+	        details.append(String.format("Old Email: %s, New Email: %s; ", oldState.getEmail(), newState.getEmail()));
 	    }
 
-	    // Extract old and new roles
-	    Set<String> oldRoles = user.getUserRoles().stream()
-	                               .map(userRole -> userRole.getRole().getRoleName())
-	                               .collect(Collectors.toSet());
-	    Set<String> newRoles = userRequestDTO.getRoles().stream()
-	                                         .map(RoleDTO::getRoleName)
-	                                         .collect(Collectors.toSet());
-
-	    if (!oldRoles.equals(newRoles)) {
-	        details.append(String.format("Old Roles: %s, New Roles: %s; ", String.join(", ", oldRoles), String.join(", ", newRoles)));
+	    if (!oldState.getRoles().equals(newState.getRoles())) {
+	        details.append(String.format("Old Roles: %s, New Roles: %s; ", String.join(", ", oldState.getRoles()), String.join(", ", newState.getRoles())));
 	    }
 
 	    return details.toString();

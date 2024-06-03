@@ -17,6 +17,7 @@ import java.util.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.optum.audit.UserSnapshot;
 import com.optum.dao.ReqRes;
 import com.optum.dao.UserDao;
 import com.optum.dto.ChangePasswordRequest;
@@ -136,18 +137,30 @@ public class UserController {
 	
 	
 	@PutMapping("/update/{userName}")
-	public ResponseEntity<ReqRes> updateUser(@PathVariable String userName,
-	                                         @RequestBody UserRequestDTO userRequestDTO) {
+	public ResponseEntity<ReqRes> updateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
 	    int currentUserRid = userRequestDTO.getCurrentUserId();
 	    long startTime = System.currentTimeMillis();
 	    try {
+	        // Fetch current state of the user
+	        Optional<User> optionalUser = userDao.findByUserName(userName);
+	        if (!optionalUser.isPresent()) {
+	            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ReqRes(404, "Not Found", "User not found"));
+	        }
+	        
+	        User currentUser = optionalUser.get();
+	        // Capture current state of the user for audit logging
+	        UserSnapshot currentState = new UserSnapshot(currentUser);
+	        
+	        // Perform the update
 	        ReqRes response = userService.updateUser(userName, userRequestDTO);
 	        if (response.getStatusCode() == 200) {
+	            // Capture new state for audit logging
+	            UserSnapshot newState = new UserSnapshot(userDao.findByUserName(userName).orElseThrow(() -> new RuntimeException("User not found after update")));
+	            
 	            CompletableFuture.runAsync(() -> {
 	                try {
-	                    String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
-	                    String details = userService.generateAuditTrailDetails(userName, userRequestDTO);
-	                    auditTrailService.logAuditTrailWithUsername("updateUser", "SUCCESS", details, currentUserRid);
+	                    String details = userService.generateAuditTrailDetails(currentState, newState, userRequestDTO);
+	                    auditTrailService.logAuditTrailWithUsername("User Update", "SUCCESS", details, currentUserRid);
 	                } catch (Exception e) {
 	                    logger.error("Failed to log audit trail for updateUser action", e);
 	                }
