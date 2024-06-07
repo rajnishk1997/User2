@@ -1,5 +1,7 @@
 package com.optum.controller;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,13 +31,14 @@ public class PermissionController {
     }
 
 
-    @PostMapping("/initialize")
-    public ResponseEntity<String> initializePermissions() {
+    @PostConstruct
+    public void initPermissions() {
         try {
-            permissionService.initializePermissions();
-            return ResponseEntity.ok("Permissions initialized successfully");
+        	permissionService.addPermissionNames();
+            System.out.println("Permissions initialized successfully.");
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to initialize permissions: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("An error occurred while initializing permissions: " + e.getMessage());
         }
     }
     

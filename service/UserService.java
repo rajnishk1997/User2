@@ -308,73 +308,6 @@ public class UserService {
 		return fullName.toString();
 	}
 
-//	@Transactional
-//	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
-//	    logger.info("Updating user with username: {}", userName);
-//	    Optional<User> optionalUser = userDao.findByUserName(userName);
-//	    if (!optionalUser.isPresent()) {
-//	        logger.warn("User not found with username: {}", userName);
-//	        return new ReqRes(404, "Not Found", "User not found");
-//	    }
-//
-//	    User user = optionalUser.get();
-//
-//	    // Update user fields
-//	    logger.info("Updating user fields for username: {}", userName);
-//	    user.setUserFirstName(userRequestDTO.getUserFirstName());
-//	    user.setUserLastName(userRequestDTO.getUserLastName());
-//	    user.setUserEmail(userRequestDTO.getUserEmail());
-//
-//	    // Get new roles from the request
-//	    Set<Role> newRoles = new HashSet<>();
-//	    for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
-//	        Role role = roleDao.findByRoleRid(roleDTO.getRoleRid())
-//	                .orElseThrow(() -> {
-//	                    logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
-//	                    return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
-//	                });
-//	        newRoles.add(role);
-//	    }
-//
-//	    logger.info("New roles prepared for user: {}", userName);
-//
-//	    // Determine roles to be removed
-//	    Set<UserRole> rolesToRemove = new HashSet<>();
-//	    for (UserRole userRole : user.getUserRoles()) {
-//	        if (!newRoles.contains(userRole.getRole())) {
-//	            rolesToRemove.add(userRole);
-//	            logger.info("Role marked for removal: {}", userRole.getRole());
-//	        }
-//	    }
-//
-//	    // Remove roles not present in newRoles
-//	    logger.info("Removing roles not present in newRoles for user: {}", userName);
-//	    for (UserRole userRole : rolesToRemove) {
-//	        user.removeUserRole(userRole); // Remove from user's collection
-//	        userRole.setUser(null); // Disassociate from user
-//	        userRoleDao.delete(userRole); // Delete from database
-//	        logger.info("Removed UserRole: {}", userRole);
-//	    }
-//
-//	    // Save changes to the database to ensure roles are removed
-//	    userRoleDao.flush();
-//	    userDao.flush(); // Ensure that deletions are flushed to the database
-//
-//	    // Add new roles
-//	    logger.info("Adding new roles for user: {}", userName);
-//	    for (Role role : newRoles) {
-//	        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
-//	            user.addRole(role);
-//	            logger.info("Role added: {}", role);
-//	        }
-//	    }
-//
-//	    // Save updated user
-//	    userDao.save(user);
-//	    logger.info("User updated successfully: {}", userName);
-//
-//	    return new ReqRes(200, null, "User updated successfully");
-//	}
 	
 	public String generateAuditTrailDetails(UserSnapshot oldState, UserSnapshot newState, UserRequestDTO userRequestDTO) {
 	    StringBuilder details = new StringBuilder();
@@ -522,21 +455,8 @@ public class UserService {
 		}
 	}
 	
-//	public List<User> getAllUsers() {
-//		try {
-//			return userDao.findAll();
-//		} catch (Exception e) {
-//			// Log the exception or handle it as needed
-//			return Collections.emptyList(); // Return an empty list in case of an error
-//		}
-//	}
-//
-//	public List<User> searchUsersByKeyword(String keyword) {
-//		 return userDao.findByUserFirstNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserNameContainingIgnoreCase(
-//		            keyword, keyword, keyword, keyword);
-//	}
+
 	
-	// Custom Query Call for better serach performance:
 
     public List<UserInfo> getAllUsers() {
         try {
@@ -563,26 +483,6 @@ public class UserService {
 		return userOptional.map(Collections::singletonList).orElseGet(Collections::emptyList);
 	}
 
-//	public List<User> findByUserFirstName(String userFirstName) {
-//		return userDao.findByUserFirstName(userFirstName);
-//	}
-
-//	public User getUserByUsername(String userName) {
-//		Optional<User> optionalUser = userDao.findByUserName(userName);
-//        return optionalUser.orElse(null);
-//	}
-
-//	public User getUserByNames(String name) {
-//		Optional<User> optionalUser = userDao
-//				.findByUserFirstNameContainingIgnoreCaseOrUserLastNameContainingIgnoreCaseOrUserMiddleNameContainingIgnoreCase(
-//						name, name, name);
-//		return optionalUser.orElse(null);
-//	}
-
-//	public List<User> findByUserLastName(String userLastName) {
-//		// TODO Auto-generated method stub
-//		return userDao.findByUserLastName(userLastName);
-//	}
 
 	@Transactional
 	public void saveUserWithRoles(User user, Set<Role> roles) {

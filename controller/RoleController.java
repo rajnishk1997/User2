@@ -20,6 +20,7 @@ import com.optum.dto.RoleDTO;
 import com.optum.dto.RoleInfo;
 import com.optum.entity.ResponseWrapper;
 import com.optum.entity.Role;
+import javax.annotation.PostConstruct;
 import com.optum.service.RoleService;
 
 @RestController
@@ -27,6 +28,17 @@ public class RoleController {
 
     @Autowired
     private RoleService roleService;
+    
+    @PostConstruct
+    public void initRoles() {
+        try {
+        	roleService.addRoleNames();
+            System.out.println("Roles initialized successfully.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println("An error occurred while initializing roles: " + e.getMessage());
+        }
+    }
 
     @PostMapping({"/createNewRole"})
     public Role createNewRole(@RequestBody Role role) {

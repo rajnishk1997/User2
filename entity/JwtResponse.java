@@ -65,6 +65,7 @@ public class JwtResponse {
 	        this.userName = user.getUserName() != null ? user.getUserName() : "";
 	        this.userEmail = user.getUserEmail() != null ? user.getUserEmail() : "";
 	        this.firstLogin = user.isFirstLogin();
+	        this.currentUserId = user.getCurrentUserId()!= null ? user.getCurrentUserId() : 0;
 	    } else {
 	        this.userName = "";
 	        this.userEmail = "";
