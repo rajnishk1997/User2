@@ -95,12 +95,21 @@ public class SOTNewtorkMasterService {
 	        );
 
 	        // Update the existing entity with new values
-	        existingNetworkMaster.setsSotNetworkName(sotNetworkMasterRequestDTO.getSSotNetworkName());
-	        existingNetworkMaster.setsGppNetworkName(sotNetworkMasterRequestDTO.getSGppNetworkName());
-	        existingNetworkMaster.setPlatform(sotNetworkMasterRequestDTO.getSPlatform());
+	        existingNetworkMaster.setsSotNetworkName(sotNetworkMasterRequestDTO.getsSotNetworkName());
+	        existingNetworkMaster.setsGppNetworkName(sotNetworkMasterRequestDTO.getsGppNetworkName());
+	        
+	        // Fetch the SPlatform entity using the provided platformRid
+	        int platformRid = sotNetworkMasterRequestDTO.getPlatformRid();
+	        Optional<SPlatform> platformOpt = sPlatformRepository.findById(platformRid);
+	        if (platformOpt.isPresent()) {
+	            existingNetworkMaster.setPlatform(platformOpt.get());
+	        } else {
+	            throw new EntityNotFoundException("Platform with ID " + platformRid + " not found.");
+	        }
+
 	        existingNetworkMaster.setsModifiedBy(sotNetworkMasterRequestDTO.getCurrentUserId());
 	        existingNetworkMaster.setsModifyDatetime(new Date());
-	        
+
 	        SOTNetworkMaster updatedNetworkMaster = sotNetworkMasterRepository.save(existingNetworkMaster);
 
 	        // Capture new values for logging
@@ -125,6 +134,7 @@ public class SOTNewtorkMasterService {
 	        throw new EntityNotFoundException("Network Master with ID " + sRid + " not found.");
 	    }
 	}
+
 	
 	  public List<SOTNetworkMasterRequestDTO> searchNetworkInfo(String keyword) {
 	        try {
