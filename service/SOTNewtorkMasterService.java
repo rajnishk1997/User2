@@ -11,17 +11,23 @@ import com.optum.entity.SPlatform;
 
 import javax.annotation.PostConstruct;
 import javax.persistence.EntityManager;
+import javax.persistence.EntityNotFoundException;
 import javax.persistence.PersistenceContext;
 import javax.transaction.Transactional;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class SOTNewtorkMasterService {
 	
 	@Autowired
 	private SOTNetworkMasterDao sotNetworkMasterRepository;
+	
+	@Autowired
+    private AuditTrailService auditTrailService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -71,6 +77,89 @@ public class SOTNewtorkMasterService {
             throw new RuntimeException("Failed to save network information.", e);
         }
     }
-		
+
+	public SOTNetworkMaster updateNetworkInfo(SOTNetworkMasterRequestDTO sotNetworkMasterRequestDTO) {
+	    // Assuming the DTO contains an ID for the record to update
+	    int sRid = sotNetworkMasterRequestDTO.getsRid();
+	    Optional<SOTNetworkMaster> existingNetworkMasterOpt = sotNetworkMasterRepository.findById(sRid);
+
+	    if (existingNetworkMasterOpt.isPresent()) {
+	        SOTNetworkMaster existingNetworkMaster = existingNetworkMasterOpt.get();
+	        
+	        // Capture old values for logging
+	        String oldValues = String.format(
+	            "Old SOT Network Info: SOT Network Name: %s, GPP Network Name: %s, Platform: %s",
+	            existingNetworkMaster.getsSotNetworkName(),
+	            existingNetworkMaster.getsGppNetworkName(),
+	            existingNetworkMaster.getsPlatform().getsPlatformName()
+	        );
+
+	        // Update the existing entity with new values
+	        existingNetworkMaster.setsSotNetworkName(sotNetworkMasterRequestDTO.getSSotNetworkName());
+	        existingNetworkMaster.setsGppNetworkName(sotNetworkMasterRequestDTO.getSGppNetworkName());
+	        existingNetworkMaster.setsPlatform(sotNetworkMasterRequestDTO.getSPlatform());
+	        existingNetworkMaster.setsModifiedBy(sotNetworkMasterRequestDTO.getCurrentUserId());
+	        existingNetworkMaster.setsModifyDatetime(new Date());
+	        
+	        SOTNetworkMaster updatedNetworkMaster = sotNetworkMasterRepository.save(existingNetworkMaster);
+
+	        // Capture new values for logging
+	        String newValues = String.format(
+	            "New SOT Network Info: SOT Network Name: %s, GPP Network Name: %s, Platform: %s",
+	            updatedNetworkMaster.getsSotNetworkName(),
+	            updatedNetworkMaster.getsGppNetworkName(),
+	            updatedNetworkMaster.getsPlatform().getsPlatformName()
+	        );
+
+	        // Log the audit trail with both old and new values
+	        CompletableFuture.runAsync(() -> {
+	            String details = String.format(
+	                "Updated SOT Network Info. %s => %s",
+	                oldValues, newValues
+	            );
+	            auditTrailService.logAuditTrailWithUsername("Network Info Updated", "SUCCESS", details, sotNetworkMasterRequestDTO.getCurrentUserId());
+	        });
+
+	        return updatedNetworkMaster;
+	    } else {
+	        throw new EntityNotFoundException("Network Master with ID " + sRid + " not found.");
+	    }
+	}
+	
+    public List<SOTNetworkMaster> searchNetworkInfo(String sotNetworkName, String gppNetworkName, String platformName) {
+        try {
+            return sotNetworkMasterRepository.searchByCriteria(sotNetworkName, gppNetworkName, platformName);
+        } catch (Exception e) {
+            // Log the exception
+            e.printStackTrace();
+            // Throw a custom exception or handle it as needed
+            throw new RuntimeException("Failed to search network information", e);
+        }
+    }
+    
+    public SOTNetworkMaster getNetworkInfoBySRid(int sRid) {
+        try {
+            return sotNetworkMasterRepository.findBySRid(sRid)
+                    .orElseThrow(() -> new EntityNotFoundException("Network Master with ID " + sRid + " not found."));
+        } catch (Exception e) {
+            // Log the exception
+            e.printStackTrace();
+            // Handle or rethrow as needed
+            throw new RuntimeException("Failed to get network information by sRid", e);
+        }
+    }
+
+    public List<SOTNetworkMaster> getAllNetworkInfo() {
+        try {
+            return sotNetworkMasterRepository.findAll();
+        } catch (Exception e) {
+            // Log the exception
+            e.printStackTrace();
+            // Handle or rethrow as needed
+            throw new RuntimeException("Failed to get all network information", e);
+        }
+    }
+
+
 }
 
