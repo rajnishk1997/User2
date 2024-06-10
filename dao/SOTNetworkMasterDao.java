@@ -10,13 +10,17 @@ import com.optum.entity.SOTNetworkMaster;
 @Repository
 public interface SOTNetworkMasterDao  extends JpaRepository<SOTNetworkMaster, Integer> {
 	 @Query("SELECT s FROM SOTNetworkMaster s WHERE " +
-	           "(:sotNetworkName IS NULL OR s.sSotNetworkName = :sotNetworkName) AND " +
-	           "(:gppNetworkName IS NULL OR s.sGppNetworkName = :gppNetworkName) AND " +
-	           "(:platformName IS NULL OR s.sPlatform.sPlatformName = :platformName)")
+	           "(:sotNetworkName IS NULL OR s.sotNetworkName = :sotNetworkName) AND " +
+	           "(:gppNetworkName IS NULL OR s.gppNetworkName = :gppNetworkName) AND " +
+	           "(:platformName IS NULL OR s.platform.platformName = :platformName)")
 	    List<SOTNetworkMaster> searchByCriteria(@Param("sotNetworkName") String sotNetworkName,
 	                                            @Param("gppNetworkName") String gppNetworkName,
 	                                            @Param("platformName") String platformName);
 	 
-	 Optional<SOTNetworkMaster> findBySRid(int sRid);
+	 Optional<SOTNetworkMaster> findById(int sRid);
    
+	  @Query("SELECT s FROM SOTNetworkMaster s WHERE " +
+	           "(:keyword IS NULL OR s.sotNetworkName LIKE %:keyword% OR " +
+	           "s.gppNetworkName LIKE %:keyword% OR s.platform.platformName LIKE %:keyword%)")
+	    List<SOTNetworkMaster> searchByKeyword(@Param("keyword") String keyword);
 }

@@ -27,8 +27,8 @@ public class RoleService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    @Value("${roles}")
-    private String roleNames;
+   // @Value("${roles}")
+  //  private String roleNames;
 
     public Role createNewRole(Role role) {
     	// Extract roleName from the incoming Role object
@@ -65,17 +65,17 @@ public class RoleService {
                     .collect(Collectors.joining(", "));
     }
     
-    @Transactional
-    public void addRoleNames() {
-        List<String> names = Arrays.asList(roleNames.split(","));
-        for (String name : names) {
-            if (!isRoleExists(name.trim())) {
-                Role role = new Role();
-                role.setRoleName(name);
-                entityManager.persist(role);
-            }
-        }
-    }
+//    @Transactional
+//    public void addRoleNames() {
+//        List<String> names = Arrays.asList(roleNames.split(","));
+//        for (String name : names) {
+//            if (!isRoleExists(name.trim())) {
+//                Role role = new Role();
+//                role.setRoleName(name);
+//                entityManager.persist(role);
+//            }
+//        }
+//    }
 
     public boolean isRoleExists(String roleName) {
         String query = "SELECT COUNT(r) FROM Role r WHERE r.name = :name";

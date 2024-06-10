@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.optum.dao.ReqRes;
 import com.optum.dto.request.SOTNetworkMasterRequestDTO;
+import com.optum.entity.ResponseWrapper;
 import com.optum.entity.SOTNetworkMaster;
 import com.optum.entity.SPlatform;
 import com.optum.service.AuditTrailService;
@@ -64,7 +66,7 @@ public class SOTNetworkMasterController {
                     "SOT Network Name: %s, GPP Network Name: %s, Platform: %s",
                     savedNetworkMaster.getsSotNetworkName(),
                     savedNetworkMaster.getsGppNetworkName(),
-                    savedNetworkMaster.getsPlatform().getsPlatformName()
+                    savedNetworkMaster.getPlatform().getPlatformName()
                 );
                 auditTrailService.logAuditTrailWithUsername("Network Info Saved", "SUCCESS", details, currentUserRid);
             });
@@ -84,8 +86,8 @@ public class SOTNetworkMasterController {
         }
     }
 
-    @PutMapping("/updateNetworkInfo")
-    public ResponseEntity<String> updateNetworkInfo(@RequestBody SOTNetworkMasterRequestDTO sotNetworkMasterRequestDTO) {
+    @PutMapping("/updateNetworkInfo/{sRid}")
+    public ResponseEntity<String> updateNetworkInfo(@PathVariable int sRid, @RequestBody SOTNetworkMasterRequestDTO sotNetworkMasterRequestDTO) {
         long startTime = System.currentTimeMillis();
 
         try {
@@ -107,20 +109,21 @@ public class SOTNetworkMasterController {
         }
     }
 
-    @GetMapping("/search")
-    public ResponseEntity<?> searchNetworkInfo(@RequestParam(required = false) String sotNetworkName,
-                                               @RequestParam(required = false) String gppNetworkName,
-                                               @RequestParam(required = false) String platformName) {
+    @GetMapping("/searchSotGpp")
+    public ResponseEntity<ResponseWrapper<List<SOTNetworkMasterRequestDTO>>> searchNetworkInfo(@RequestParam(required = true) String keyword) {
         try {
-            List<SOTNetworkMaster> results = sotNetworkMasterService.searchNetworkInfo(sotNetworkName, gppNetworkName, platformName);
-            return ResponseEntity.ok(results);
+            List<SOTNetworkMasterRequestDTO> results = sotNetworkMasterService.searchNetworkInfo(keyword);
+            ReqRes reqRes;
+            if (results.isEmpty()) {
+                reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Networks not found", "No networks found in the database matching the keyword: " + keyword);
+            } else {
+                reqRes = new ReqRes(HttpStatus.OK.value(), null, "Networks retrieved successfully");
+            }
+            return ResponseEntity.ok(new ResponseWrapper<>(results, reqRes));
         } catch (Exception e) {
-            // Log the exception
-            e.printStackTrace();
-            // Return error response
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to search network information");
+            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while searching networks with keyword: " + keyword);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));
         }
-    }
     
     @GetMapping("getSOTNetwork/{sRid}")
     public ResponseEntity<?> getNetworkInfoBySRid(@PathVariable int sRid) {

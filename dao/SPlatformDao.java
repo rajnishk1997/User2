@@ -9,7 +9,7 @@ import com.optum.entity.SPlatform;
 @Repository
 public interface SPlatformDao extends JpaRepository<SPlatform, Integer> {
 
-	 @Query("SELECT p FROM SPlatform p WHERE p.sPlatformName = :platformName")
+	 @Query("SELECT p FROM SPlatform p WHERE p.platformName = :platformName")
     SPlatform findBySPlatformName(String platformName);
 
 }

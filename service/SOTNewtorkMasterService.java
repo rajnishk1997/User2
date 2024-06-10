@@ -41,7 +41,7 @@ public class SOTNewtorkMasterService {
         for (String name : names) {
             if (!isPlatformExists(name.trim())) {
                 SPlatform platform = new SPlatform();
-                platform.setsPlatformName(name.trim());
+                platform.setPlatformName(name.trim());
                 platform.setsCreatedDatetime(new Date());
                 entityManager.persist(platform);
             }
@@ -68,7 +68,7 @@ public class SOTNewtorkMasterService {
             SOTNetworkMaster sotNetworkMaster = new SOTNetworkMaster();
             sotNetworkMaster.setsSotNetworkName(sSotNetworkName);
             sotNetworkMaster.setsGppNetworkName(sGppNetworkName);
-            sotNetworkMaster.setsPlatform(sPlatform);
+            sotNetworkMaster.setPlatform(sPlatform);
             sotNetworkMaster.setsCreatedBy(sCreatedBy);
             sotNetworkMaster.setsCreatedDatetime(sCreatedDatetime);
             return sotNetworkMasterRepository.save(sotNetworkMaster);
@@ -91,13 +91,13 @@ public class SOTNewtorkMasterService {
 	            "Old SOT Network Info: SOT Network Name: %s, GPP Network Name: %s, Platform: %s",
 	            existingNetworkMaster.getsSotNetworkName(),
 	            existingNetworkMaster.getsGppNetworkName(),
-	            existingNetworkMaster.getsPlatform().getsPlatformName()
+	            existingNetworkMaster.getPlatform().getPlatformName()
 	        );
 
 	        // Update the existing entity with new values
 	        existingNetworkMaster.setsSotNetworkName(sotNetworkMasterRequestDTO.getSSotNetworkName());
 	        existingNetworkMaster.setsGppNetworkName(sotNetworkMasterRequestDTO.getSGppNetworkName());
-	        existingNetworkMaster.setsPlatform(sotNetworkMasterRequestDTO.getSPlatform());
+	        existingNetworkMaster.setPlatform(sotNetworkMasterRequestDTO.getSPlatform());
 	        existingNetworkMaster.setsModifiedBy(sotNetworkMasterRequestDTO.getCurrentUserId());
 	        existingNetworkMaster.setsModifyDatetime(new Date());
 	        
@@ -108,7 +108,7 @@ public class SOTNewtorkMasterService {
 	            "New SOT Network Info: SOT Network Name: %s, GPP Network Name: %s, Platform: %s",
 	            updatedNetworkMaster.getsSotNetworkName(),
 	            updatedNetworkMaster.getsGppNetworkName(),
-	            updatedNetworkMaster.getsPlatform().getsPlatformName()
+	            updatedNetworkMaster.getPlatform().getPlatformName()
 	        );
 
 	        // Log the audit trail with both old and new values
@@ -126,20 +126,23 @@ public class SOTNewtorkMasterService {
 	    }
 	}
 	
-    public List<SOTNetworkMaster> searchNetworkInfo(String sotNetworkName, String gppNetworkName, String platformName) {
-        try {
-            return sotNetworkMasterRepository.searchByCriteria(sotNetworkName, gppNetworkName, platformName);
-        } catch (Exception e) {
-            // Log the exception
-            e.printStackTrace();
-            // Throw a custom exception or handle it as needed
-            throw new RuntimeException("Failed to search network information", e);
-        }
-    }
-    
+	  public List<SOTNetworkMasterRequestDTO> searchNetworkInfo(String keyword) {
+	        try {
+	            List<SOTNetworkMaster> entities = sotNetworkMasterRepository.searchByKeyword(keyword);
+	            return entities.stream()
+	                .map(this::convertToDTO)
+	                .collect(Collectors.toList());
+	        } catch (Exception e) {
+	            // Log the exception
+	            e.printStackTrace();
+	            // Handle or rethrow as needed
+	            throw new RuntimeException("Failed to search network information with keyword: " + keyword, e);
+	        }
+	    }
+	  
     public SOTNetworkMaster getNetworkInfoBySRid(int sRid) {
         try {
-            return sotNetworkMasterRepository.findBySRid(sRid)
+            return sotNetworkMasterRepository.findById(sRid)
                     .orElseThrow(() -> new EntityNotFoundException("Network Master with ID " + sRid + " not found."));
         } catch (Exception e) {
             // Log the exception

@@ -29,16 +29,16 @@ public class RoleController {
     @Autowired
     private RoleService roleService;
     
-    @PostConstruct
-    public void initRoles() {
-        try {
-        	roleService.addRoleNames();
-            System.out.println("Roles initialized successfully.");
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.err.println("An error occurred while initializing roles: " + e.getMessage());
-        }
-    }
+//    @PostConstruct
+//    public void initRoles() {
+//        try {
+//        	roleService.addRoleNames();
+//            System.out.println("Roles initialized successfully.");
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            System.err.println("An error occurred while initializing roles: " + e.getMessage());
+//        }
+//    }
 
     @PostMapping({"/createNewRole"})
     public Role createNewRole(@RequestBody Role role) {
