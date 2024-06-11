@@ -22,8 +22,8 @@ public class RoleConfig {
 	 private final PermissionDao permissionRepository;
 
     // Inject role names from properties file using @Value annotation
-    @Value("${role}")
-    private String roleNames;
+  //  @Value("${role}")
+ //   private String roleNames;
 
     // Inject RoleRepository
     @Autowired

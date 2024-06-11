@@ -124,6 +124,7 @@ public class SOTNetworkMasterController {
             ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while searching networks with keyword: " + keyword);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));
         }
+        }
     
     @GetMapping("getSOTNetwork/{sRid}")
     public ResponseEntity<?> getNetworkInfoBySRid(@PathVariable int sRid) {

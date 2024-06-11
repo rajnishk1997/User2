@@ -2,13 +2,18 @@ package com.optum.controller;
 
 import java.sql.Date;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -55,7 +60,29 @@ public class JwtController {
 	    } finally {
 	        long endTime = System.currentTimeMillis();
 	        long duration = endTime - startTime;
-	        logger.info("Action performed in " + duration + "ms");
+	        logger.info("Login Action performed in " + duration + "ms");
+	    }
+	}
+	
+	@PostMapping("/logout")
+	public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication, @RequestBody Integer currentUserId) {
+	    long startTime = System.currentTimeMillis();
+	    try {
+	        if (authentication != null) {
+	            new SecurityContextLogoutHandler().logout(request, response, authentication);
+	        }
+	        // Log the logout action
+	        auditTrailService.logAuditTrailWithUsername("logout", "SUCCESS", "Logged out successfully", currentUserId);
+	        // Optionally, you can log successful logout
+	        logger.info("User with ID {} logged out successfully", currentUserId);
+	        return ResponseEntity.ok("Logged out successfully");
+	    } catch (Exception e) {
+	        logger.error("Logout failed", e);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to logout");
+	    } finally {
+	        long endTime = System.currentTimeMillis();
+	        long duration = endTime - startTime;
+	        logger.info("Log Out Action performed in {}ms", duration);
 	    }
 	}
 }
