@@ -43,10 +43,22 @@ public class JwtController {
 	    long startTime = System.currentTimeMillis();
 	    Integer currentUserRid = null;
 	    try {
-	        JwtResponse customJwtResponse = jwtService.createJwtToken(jwtRequest);
-	        currentUserRid = customJwtResponse.getCurrentUserId();
-	        auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + jwtRequest.getUserName(), currentUserRid);
-	        return ResponseEntity.ok(customJwtResponse);
+	        String loginIdentifier = jwtRequest.getUserName();
+
+	        // Check if the provided input is an email
+	        if (isValidEmail(loginIdentifier)) {
+	            // If it's an email, directly call the service layer with the email
+	            JwtResponse customJwtResponse = jwtService.createJwtTokenByEmail(loginIdentifier, jwtRequest.getUserPassword());
+	            currentUserRid = customJwtResponse.getCurrentUserId();
+	            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for email: " + loginIdentifier, currentUserRid);
+	            return ResponseEntity.ok(customJwtResponse);
+	        } else {
+	            // If it's not an email, assume it's a username and call the service layer with the username
+	            JwtResponse customJwtResponse = jwtService.createJwtTokenByUsername(loginIdentifier, jwtRequest.getUserPassword());
+	            currentUserRid = customJwtResponse.getCurrentUserId();
+	            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + loginIdentifier, currentUserRid);
+	            return ResponseEntity.ok(customJwtResponse);
+	        }
 	    } catch (BadCredentialsException e) {
 	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 	                .body(new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null));
@@ -63,6 +75,14 @@ public class JwtController {
 	        logger.info("Login Action performed in " + duration + "ms");
 	    }
 	}
+
+	// Validate email address format
+	private boolean isValidEmail(String email) {
+	    // Regular expression for basic email validation
+	    String emailRegex = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+	    return email.matches(emailRegex);
+	}
+
 	
 	@PostMapping("/logout")
 	public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication, @RequestBody Integer currentUserId) {

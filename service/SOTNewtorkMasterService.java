@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.optum.dao.SOTNetworkMasterDao;
+import com.optum.dao.SPlatformDao;
 import com.optum.dto.request.SOTNetworkMasterRequestDTO;
 import com.optum.entity.SOTNetworkMaster;
 import com.optum.entity.SPlatform;
@@ -19,6 +20,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
 public class SOTNewtorkMasterService {
@@ -28,6 +30,9 @@ public class SOTNewtorkMasterService {
 	
 	@Autowired
     private AuditTrailService auditTrailService;
+	
+	@Autowired
+	private SPlatformDao sPlatformRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -95,11 +100,11 @@ public class SOTNewtorkMasterService {
 	        );
 
 	        // Update the existing entity with new values
-	        existingNetworkMaster.setsSotNetworkName(sotNetworkMasterRequestDTO.getsSotNetworkName());
-	        existingNetworkMaster.setsGppNetworkName(sotNetworkMasterRequestDTO.getsGppNetworkName());
+	        existingNetworkMaster.setsSotNetworkName(sotNetworkMasterRequestDTO.getSSotNetworkName());
+	        existingNetworkMaster.setsGppNetworkName(sotNetworkMasterRequestDTO.getSGppNetworkName());
 	        
 	        // Fetch the SPlatform entity using the provided platformRid
-	        int platformRid = sotNetworkMasterRequestDTO.getPlatformRid();
+	        int platformRid = sotNetworkMasterRequestDTO.getSPlatform().getSpRid();
 	        Optional<SPlatform> platformOpt = sPlatformRepository.findById(platformRid);
 	        if (platformOpt.isPresent()) {
 	            existingNetworkMaster.setPlatform(platformOpt.get());
@@ -149,6 +154,17 @@ public class SOTNewtorkMasterService {
 	            throw new RuntimeException("Failed to search network information with keyword: " + keyword, e);
 	        }
 	    }
+	  
+	  private SOTNetworkMasterRequestDTO convertToDTO (SOTNetworkMaster entity) {
+		  SOTNetworkMasterRequestDTO dto = new SOTNetworkMasterRequestDTO();
+		  dto.setSSotNetworkName(entity.getsSotNetworkName());
+		  dto.setSGppNetworkName(entity.getsGppNetworkName());
+		  dto.setsRid(entity.getsRid());
+		  if(entity.getPlatform()!=null) {
+			  dto.setSPlatform(null);
+		  }
+		  return dto;
+	  }
 	  
     public SOTNetworkMaster getNetworkInfoBySRid(int sRid) {
         try {

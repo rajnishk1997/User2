@@ -52,4 +52,7 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 
 	  @Query("SELECT u FROM User u LEFT JOIN FETCH u.userRoles ur LEFT JOIN FETCH ur.role r LEFT JOIN FETCH r.rolePermissions rp LEFT JOIN FETCH rp.permission WHERE u.userName = :userName")
 	    Optional<User> findByUserNameWithRolesAndPermissions(@Param("userName") String userName);
+
+	 @Query("SELECT u FROM User u WHERE u.userEmail = :userEmail")
+    Optional<User> findByUserEmail(@Param("userEmail") String userEmail);
 }

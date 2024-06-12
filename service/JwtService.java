@@ -45,16 +45,55 @@ public class JwtService implements UserDetailsService {
     private AuthenticationManager authenticationManager;
     
     @Transactional
-    public JwtResponse createJwtToken(JwtRequest jwtRequest) throws BadCredentialsException, UsernameNotFoundException {
-        String userName = jwtRequest.getUserName();
-        String userPassword = jwtRequest.getUserPassword();
+    public JwtResponse createJwtTokenByEmail(String userEmail, String userPassword) throws BadCredentialsException, UsernameNotFoundException {
+        // Try to find the user by email
+        User user = userDao.findByUserEmail(userEmail).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        
+        // Check if user is active
+        if (!user.isActiveUser()) {
+            throw new UsernameNotFoundException("User is not active");
+        }
+
+        // Authenticate user
+        authenticate(user.getUserName(), userPassword);
+
+        UserDetails userDetails = loadUserByUsername(user.getUserName());
+        String newGeneratedToken = jwtUtil.generateToken(userDetails);
+
+        Set<RoleInfo> roleInfos = new HashSet<>();
+        for (UserRole userRole : user.getUserRoles()) {
+            Role role = userRole.getRole();
+            RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
+
+            Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
+                                                       .map(rolePermission -> {
+                                                           Permission permission = rolePermission.getPermission();
+                                                           return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
+                                                       })
+                                                       .collect(Collectors.toSet());
+
+            roleInfo.setPermissions(permissionInfos);
+            roleInfos.add(roleInfo);
+        }
+
+        return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
+    }
+
+    @Transactional
+    public JwtResponse createJwtTokenByUsername(String userName, String userPassword) throws BadCredentialsException, UsernameNotFoundException {
+        // Try to find the user by username
+        User user = userDao.findByUserName(userName).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        
+        // Check if user is active
+        if (!user.isActiveUser()) {
+            throw new UsernameNotFoundException("User is not active");
+        }
+
+        // Authenticate user
         authenticate(userName, userPassword);
 
         UserDetails userDetails = loadUserByUsername(userName);
         String newGeneratedToken = jwtUtil.generateToken(userDetails);
-
-        User user = userDao.findByUserNameWithRolesAndPermissions(userName)
-                           .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         Set<RoleInfo> roleInfos = new HashSet<>();
         for (UserRole userRole : user.getUserRoles()) {
