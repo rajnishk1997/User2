@@ -10,6 +10,7 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 
 import com.optum.audit.UserSnapshot;
+import com.optum.constants.Constants;
 import com.optum.dao.PermissionDao;
 import com.optum.dao.ReqRes;
 import com.optum.dao.RoleDao;
@@ -648,7 +649,6 @@ public class UserService {
     }
 	 
 	  public ReqRes acceptNewUser(String userName, UserRequestDTO userRequestDTO) {
-	        Integer currentUserRid = userRequestDTO.getCurrentUserId();
 	        Optional<User> optionalUser = userDao.findByUserNameAndIsNewUserTrue(userName);
 	        if (optionalUser.isPresent()) {
 	            User user = optionalUser.get();
@@ -666,6 +666,14 @@ public class UserService {
 	        user.setUserPassword(passwordEncoder.encode(newPassword));
 	        user.setFirstLogin(false);
 	        userDao.save(user);
+	    }
+	  
+	  public List<String> getManagers() {
+	        return getUserNamesByRole(Constants.MANAGER);
+	    }
+
+	  public List<String> getUserNamesByRole(String roleName) {
+	        return userDao.findUserNamesByRoleName(roleName);
 	    }
 
 }

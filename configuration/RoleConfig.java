@@ -10,6 +10,8 @@ import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.optum.dao.PermissionDao;
@@ -17,9 +19,37 @@ import com.optum.dao.RoleDao;
 import com.optum.entity.Role;
 import com.optum.entity.Permission;
 
+@Configuration
+@PropertySource({"classpath:role.properties"})
 public class RoleConfig {
 	private final RoleDao roleRepository;
 	 private final PermissionDao permissionRepository;
+	 
+	 public static String MANAGER;
+	    public static String ADMIN;
+	    public static String AUDITOR;
+	    public static String ANALYST;
+
+	    @Value("${role.manager}")
+	    private String Manager;
+
+	    @Value("${role.admin}")
+	    private String Admin;
+
+	    @Value("${role.auditor}")
+	    private String Auditor;
+	    
+	    @Value("${role.analyst}")
+	    private String Analyst;
+
+	    @PostConstruct
+	    private void init() {
+	        MANAGER = Manager;
+	        ADMIN = Admin;
+	        AUDITOR = Auditor;
+	        ANALYST = Analyst;
+	        
+	    }
 
     // Inject role names from properties file using @Value annotation
   //  @Value("${role}")

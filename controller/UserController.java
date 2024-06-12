@@ -344,6 +344,11 @@ public class UserController {
         }
     }
     
+    @GetMapping("/managers")
+    public ResponseEntity<List<String>> getManagers() {
+        List<String> userNames = userService.getManagers();
+        return ResponseEntity.ok(userNames);
+    }
 
 	@GetMapping({ "/forAdmin" })
 	@PreAuthorize("hasRole('Admin')")
