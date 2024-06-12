@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import javax.annotation.PostConstruct;
+import javax.management.relation.RoleNotFoundException;
 @RestController
 public class UserController {
 	
@@ -345,9 +346,15 @@ public class UserController {
     }
     
     @GetMapping("/managers")
-    public ResponseEntity<List<String>> getManagers() {
-        List<String> userNames = userService.getManagers();
-        return ResponseEntity.ok(userNames);
+    public ResponseEntity<ResponseWrapper<List<UserInfo>>> getManagers() {
+        try {
+            List<UserInfo> userInfos = userService.getManagers();
+            ReqRes reqRes = new ReqRes(); 
+            ResponseWrapper<List<UserInfo>> response = new ResponseWrapper<>(userInfos, reqRes);
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to fetch managers list", ex);
+        }
     }
 
 	@GetMapping({ "/forAdmin" })
