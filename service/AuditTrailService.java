@@ -51,10 +51,14 @@ public class AuditTrailService {
 		logAuditTrail(action, status, detailedMessage, userId, new Date());
 	}
 
-	public Page<AuditTrail> getAuditTrails(Pageable pageable) {
-		return auditTrailRepository.findAllByOrderByTimestampDesc(pageable);
-	}
+//	public Page<AuditTrail> getAuditTrails(Pageable pageable) {
+//		return auditTrailRepository.findAllByOrderByTimestampDesc(pageable);
+//	}
 
+	public List<AuditTrail> getAuditTrails() {
+	    return auditTrailRepository.findAllByOrderByTimestampDesc();
+	}
+	
 	public List<AuditTrail> filterAuditTrail(String userName, String action, Date fromDate, Date toDate) {
 	    Specification<AuditTrail> spec = Specification.where(null);
 
