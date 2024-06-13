@@ -44,6 +44,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -321,22 +322,29 @@ public class UserService {
 	    StringBuilder details = new StringBuilder();
 
 	    // Check and log changes for each field
-	    if (!oldState.getFirstName().equals(newState.getFirstName())) {
+	    if (!Objects.equals(oldState.getFirstName(), newState.getFirstName())) {
 	        details.append(String.format("Old First Name: %s, New First Name: %s; ", oldState.getFirstName(), newState.getFirstName()));
 	    }
-	    if (!oldState.getLastName().equals(newState.getLastName())) {
+	    if (!Objects.equals(oldState.getLastName(), newState.getLastName())) {
 	        details.append(String.format("Old Last Name: %s, New Last Name: %s; ", oldState.getLastName(), newState.getLastName()));
 	    }
-	    if (!oldState.getEmail().equals(newState.getEmail())) {
+	    if (!Objects.equals(oldState.getEmail(), newState.getEmail())) {
 	        details.append(String.format("Old Email: %s, New Email: %s; ", oldState.getEmail(), newState.getEmail()));
 	    }
 
-	    if (!oldState.getRoles().equals(newState.getRoles())) {
-	        details.append(String.format("Old Roles: %s, New Roles: %s; ", String.join(", ", oldState.getRoles()), String.join(", ", newState.getRoles())));
+	    if (!Objects.equals(oldState.getRoles(), newState.getRoles())) {
+	        details.append(String.format("Old Roles: %s, New Roles: %s; ",
+	                String.join(", ", oldState.getRoles()), String.join(", ", newState.getRoles())));
+	    }
+
+	    if (!Objects.equals(oldState.getManagerName(), newState.getManagerName())) {
+	        details.append(String.format("Old Manager Name: %s, New Manager Name: %s; ",
+	                oldState.getManagerName(), newState.getManagerName()));
 	    }
 
 	    return details.toString();
 	}
+
 
 	@Transactional
 	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
