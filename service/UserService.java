@@ -661,15 +661,6 @@ public class UserService {
 	        user.setUserPlainPassword(null);
 	        return userDao.save(user);
 	    }
-
-	 public List<UserInfo> getNewUsers() {
-        try {
-            return userDao.findNewUsers();
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            return Collections.emptyList(); // Return an empty list in case of an error
-        }
-    }
 	 
 	  public ReqRes acceptNewUser(String userName, UserRequestDTO userRequestDTO) {
 	        Optional<User> optionalUser = userDao.findByUserNameAndIsNewUserTrue(userName);
@@ -698,4 +689,12 @@ public class UserService {
 	    public List<UserInfo> getManagers() {
 	        return getUserInfosByRole("Manager");
 	    }
+
+		public List<UserInfo> getNewUsers(int managerId) {
+			  try {
+			        return userDao.findNewUsersByManagerId(managerId);
+			    } catch (Exception e) {
+			        return Collections.emptyList(); 
+			    }
+		}
 }

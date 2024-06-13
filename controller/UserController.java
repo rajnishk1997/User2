@@ -209,17 +209,18 @@ public class UserController {
 	    }
 
 	  
-	@GetMapping("/newuser")
-    public ResponseEntity<ResponseWrapper<List<UserInfo>>> getNewUsers() {
-        try {
-            List<UserInfo> newUsers = userService.getNewUsers();
-            ResponseWrapper<List<UserInfo>> responseWrapper = new ResponseWrapper<>(newUsers, new ReqRes(200, null, "Users retrieved successfully"));
-            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-        } catch (Exception e) {
-            ResponseWrapper<List<UserInfo>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
-            return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
+	 @GetMapping("/newuser")
+	 public ResponseEntity<ResponseWrapper<List<UserInfo>>> getNewUsers(@RequestParam int managerId) {
+	     try {
+	         List<UserInfo> newUsers = userService.getNewUsers(managerId);
+	         ResponseWrapper<List<UserInfo>> responseWrapper = new ResponseWrapper<>(newUsers, new ReqRes(200, null, "Users retrieved successfully"));
+	         return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
+	     } catch (Exception e) {
+	         ResponseWrapper<List<UserInfo>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
+	         return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
+	     }
+	 }
+
 
 
 	 @PostMapping("/accept/{userName}")

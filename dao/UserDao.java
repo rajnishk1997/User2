@@ -56,7 +56,11 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 	 @Query("SELECT u FROM User u WHERE u.userEmail = :userEmail")
     Optional<User> findByUserEmail(@Param("userEmail") String userEmail);
 	 
-	  @Query("SELECT new com.example.dto.UserInfoDTO(u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser, u.userRid) " +
+	  @Query("SELECT new com.optum.dto.UserInfoDTO(u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser, u.userRid) " +
 	           "FROM User u JOIN u.userRoles ur JOIN ur.role r WHERE r.roleName = :roleName")
 	    List<UserInfo> findUserInfosByRoleName(@Param("roleName") String roleName);
+
+	  @Query("SELECT new com.opyum.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.email) " +
+           "FROM User u WHERE u.isNewUser = true AND u.manager.userRid = :managerId")
+    List<UserInfo> findNewUsersByManagerId(@Param("managerId") int managerId);
 }
