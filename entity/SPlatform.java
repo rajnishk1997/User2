@@ -13,7 +13,7 @@ public class SPlatform {
     private int spRid;
 
     @Column(name = "s_platform_name")
-    private String sPlatformName;
+    private String platformName;
 
     @Column(name = "s_created_datetime")
     @Temporal(TemporalType.TIMESTAMP)
@@ -28,15 +28,15 @@ public class SPlatform {
         this.spRid = spRid;
     }
 
-    public String getsPlatformName() {
-        return sPlatformName;
-    }
+    public String getPlatformName() {
+		return platformName;
+	}
 
-    public void setsPlatformName(String sPlatformName) {
-        this.sPlatformName = sPlatformName;
-    }
+	public void setPlatformName(String platformName) {
+		this.platformName = platformName;
+	}
 
-    public Date getsCreatedDatetime() {
+	public Date getsCreatedDatetime() {
         return sCreatedDatetime;
     }
 

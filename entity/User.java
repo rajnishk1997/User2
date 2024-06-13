@@ -24,6 +24,11 @@ public class User {
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private Set<UserRole> userRoles = new HashSet<>();
     
+    //The manager field
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id") // This column will hold the userRid of the manager
+    private User manager;
+    
     @Column(name = "u_username")
     private String userName;
     @Column(name = "u_first_name")
@@ -54,6 +59,8 @@ public class User {
     private boolean isNewUser=true;
     @Column(name = "u_first_login")
     private boolean firstLogin = true;
+    @Column(name="u_managerName")
+    private String managerName;
 
     
     public boolean isFirstLogin() {
@@ -287,5 +294,21 @@ public class User {
 
 	public void setModifiedDate(Date modifiedDate) {
 		this.modifiedDate = modifiedDate;
+	}
+
+	public User getManager() {
+		return manager;
+	}
+
+	public void setManager(User manager) {
+		this.manager = manager;
+	}
+
+	public String getManagerName() {
+		return managerName;
+	}
+
+	public void setManagerName(String managerName) {
+		this.managerName = managerName;
 	}
 }

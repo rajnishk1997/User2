@@ -15,8 +15,8 @@ public class AuditTrail {
     @Column(name = "action")
     private String action;
 
-    @Column(name = "status")
-    private String status;
+    @Column(name = "u_username")
+    private String userName;
 
     @Column(name = "details")
     private String details;
@@ -45,14 +45,7 @@ public class AuditTrail {
         this.action = action;
     }
 
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
+   
     public String getDetails() {
         return details;
     }

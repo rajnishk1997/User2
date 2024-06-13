@@ -12,6 +12,8 @@ public class UserRequestDTO {
     private String userEmployeeId;
     private Set<RoleDTO> roles;
     private Integer currentUserId;
+    private Integer managerId;
+    private String managerName;
     
 	public String getUserFirstName() {
 		return userFirstName;
@@ -53,15 +55,21 @@ public class UserRequestDTO {
 	}
 	public void setRoles(Set<RoleDTO> roles) {
 		this.roles = roles;
-	}
-	
-//	public List<RoleDTO> getRoles() {
-//		return roles;
-//	}
-//	public void setRoles(List<RoleDTO> roles) {
-//		this.roles = roles;
-//	}
-	
+	} 
+	public Integer getManagerId() {
+        return managerId;
+    }
 
+    public void setManagerId(Integer managerId) {
+        this.managerId = managerId;
+    }
+	public String getManagerName() {
+		return managerName;
+	}
+	public void setManagerName(String managerName) {
+		this.managerName = managerName;
+	}
+    
+    
     
 }

@@ -20,7 +20,7 @@ public class SOTNetworkMaster {
 
     @OneToOne
     @JoinColumn(name = "s_platform_id", referencedColumnName = "sp_rid")
-    private SPlatform sPlatform;
+    private SPlatform platform;
 
     @Column(name = "s_created_by")
     private Integer sCreatedBy;
@@ -61,15 +61,16 @@ public class SOTNetworkMaster {
         this.sGppNetworkName = sGppNetworkName;
     }
 
-    public SPlatform getsPlatform() {
-        return sPlatform;
-    }
 
-    public void setsPlatform(SPlatform sPlatform) {
-        this.sPlatform = sPlatform;
-    }
+    public SPlatform getPlatform() {
+		return platform;
+	}
 
-    public Integer getsCreatedBy() {
+	public void setPlatform(SPlatform platform) {
+		this.platform = platform;
+	}
+
+	public Integer getsCreatedBy() {
         return sCreatedBy;
     }
 
