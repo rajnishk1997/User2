@@ -1,36 +1,5 @@
-import org.springframework.data.jpa.domain.Specification;
-import javax.persistence.criteria.Predicate;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
-public List<AuditTrail> filterAuditTrail(String userName, String action, Date fromDate, Date toDate) {
-    Specification<AuditTrail> spec = (root, query, criteriaBuilder) -> {
-        List<Predicate> predicates = new ArrayList<>();
-
-        if (userName != null && !userName.isEmpty()) {
-            predicates.add(criteriaBuilder.equal(root.get("userId"), getUserIdFromUserName(userName)));
-        }
-
-        if (action != null && !action.isEmpty()) {
-            predicates.add(criteriaBuilder.equal(root.get("action"), action));
-        }
-
-        if (fromDate != null && toDate != null) {
-            predicates.add(criteriaBuilder.between(root.get("timestamp"), fromDate, toDate));
-        } else if (fromDate != null) {
-            predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("timestamp"), fromDate));
-        } else if (toDate != null) {
-            predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("timestamp"), toDate));
-        }
-
-        // Combine all predicates with AND logic
-        return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-    };
-
-    Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE, Sort.by("timestamp").descending());
-
-    Page<AuditTrail> pageResult = auditTrailRepository.findAll(spec, pageable);
-
-    return pageResult.getContent();
-}
+public List<PermissionDTO> getAllPermissions() {
+        return permissionRepository.findAll().stream()
+                .map(permission -> new PermissionDTO(permission.getPermissionRid(), permission.getPermissionName()))
+                .collect(Collectors.toList());
+    }
