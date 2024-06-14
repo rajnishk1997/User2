@@ -1,23 +1,17 @@
-@Transactional
-    public RoleInfo mapPermissionsToRole(int roleId, List<PermissionDTO> permissionDTOs) {
+public RoleInfo getPermissionsForRole(int roleId) {
         Role role = roleRepository.findById(roleId).orElseThrow(() -> new RuntimeException("Role not found"));
-        Set<Permission> permissions = permissionDTOs.stream()
-                .map(dto -> permissionRepository.findById(dto.getPermissionRid()).orElseThrow(() -> new RuntimeException("Permission not found")))
-                .collect(Collectors.toSet());
-
-        role.setPermissions(permissions);
-        roleRepository.save(role);
-
-        Set<PermissionInfo> permissionInfos = permissions.stream()
-                .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
+        Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
+                .map(rolePermission -> new PermissionInfo(rolePermission.getPermission().getPermissionRid(), rolePermission.getPermission().getPermissionName()))
                 .collect(Collectors.toSet());
 
         return new RoleInfo(role.getRoleRid(), role.getRoleName(), permissionInfos);
     }
 	
 	
-	  @PostMapping("/{roleId}/permissions")
-    public ResponseEntity<RoleInfo> mapPermissionsToRole(@PathVariable int roleId, @RequestBody List<PermissionDTO> permissionDTOs) {
-        RoleInfo updatedRole = rolePermissionService.mapPermissionsToRole(roleId, permissionDTOs);
-        return new ResponseEntity<>(updatedRole, HttpStatus.OK);
+	 @GetMapping("/{roleId}/permissions")
+    public ResponseEntity<RoleInfo> getPermissionsForRole(@PathVariable int roleId) {
+        RoleInfo roleInfo = rolePermissionService.getPermissionsForRole(roleId);
+        return new ResponseEntity<>(roleInfo, HttpStatus.OK);
     }
+	
+	
