@@ -21,9 +21,16 @@ public class PermissionService {
     
     @PersistenceContext
     private EntityManager entityManager;
+    
+    @Autowired
+    private PermissionDao permissionRepository;
 
     @Value("${permissions}")
     private String permissionNames;
+    
+    public List<Permission> getAllPermissions() {
+        return permissionRepository.findAll();
+    }
 
     
     @Transactional

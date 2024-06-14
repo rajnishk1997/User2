@@ -1,10 +1,13 @@
 package com.optum.controller;
 
+import java.util.List;
+
 import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -68,6 +71,12 @@ public class PermissionController {
         permissionRepository.delete(existingPermission);
         ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "", "Permission removed successfully");
         return ResponseEntity.ok(new ResponseWrapper<>("Permission removed successfully", reqRes));
+    }
+    
+    @GetMapping("/getAllPermissions")
+    public ResponseEntity<List<Permission>> getAllPermissions() {
+        List<Permission> permissions = permissionService.getAllPermissions();
+        return new ResponseEntity<>(permissions, HttpStatus.OK);
     }
 }
 
