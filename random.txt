@@ -1,60 +1,27 @@
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+ @Transactional
+    public RoleInfo mapPermissionsToRole(int roleId, List<PermissionDTO> permissionDTOs, int currentUserRid) {
+        Role role = roleRepository.findById(roleId).orElseThrow(() -> new RuntimeException("Role not found"));
+        Set<Permission> permissions = permissionDTOs.stream()
+                .map(dto -> permissionRepository.findById(dto.getPermissionRid()).orElseThrow(() -> new RuntimeException("Permission not found")))
+                .collect(Collectors.toSet());
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
+        role.setPermissions(permissions);
+        roleRepository.save(role);
 
-@RestController
-public class RoleController {
-
-    private final RolePermissionService rolePermissionService;
-
-    public RoleController(RolePermissionService rolePermissionService) {
-        this.rolePermissionService = rolePermissionService;
-    }
-
-    @PostMapping("/permissions/{roleId}")
-    public ResponseEntity<Void> mapPermissionsToRole(@PathVariable int roleId, @RequestBody Map<String, Object> request) {
-        int currentUserRid = (Integer) request.get("currentUserRid");
-        List<Map<String, Object>> permissions = (List<Map<String, Object>>) request.get("permissionInfoList");
-
-        // Extract permission IDs from the list of permissions
-        List<Integer> permissionIds = permissions.stream()
-                .map(permission -> (Integer) permission.get("permissionRid"))
+        List<String> permissionNames = permissions.stream()
+                .map(Permission::getPermissionName)
                 .collect(Collectors.toList());
 
-        CompletableFuture.runAsync(() -> {
-            Role updatedRole = rolePermissionService.mapPermissionsToRole(roleId, permissionIds);
+        // Format the permission details for logging
+        String permissionDetails = permissions.stream()
+                .map(permission -> String.format("%s (ID: %d)", permission.getPermissionName(), permission.getPermissionRid()))
+                .collect(Collectors.joining(", "));
 
-            Set<PermissionInfo> permissionInfo = updatedRole.getPermissions().stream()
-                    .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
-                    .collect(Collectors.toSet());
+        // Log the audit trail
+        String logDetails = String.format("Role Name: %s and Associated Permissions: %s", role.getRoleName(), permissionDetails);
+        logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", logDetails, currentUserRid, LocalDateTime.now());
 
-            // Convert permissionInfo to a string for logging
-            String permissionDetails = permissionInfo.stream()
-                    .map(PermissionInfo::toString)
-                    .collect(Collectors.joining(", "));
-
-            // Log the audit trail
-            logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", "Mapped permissions to role: " + permissionDetails, currentUserRid, LocalDateTime.now());
-        });
-
-        return ResponseEntity.ok().build();
+        return new RoleInfo(role.getRoleRid(), role.getRoleName(), permissions.stream()
+                .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
+                .collect(Collectors.toSet()));
     }
-
-    private void logAuditTrailWithUsername(String action, String status, String details, int userId, LocalDateTime timestamp) {
-        // Implementation of logging the audit trail
-        System.out.println("Action: " + action);
-        System.out.println("Status: " + status);
-        System.out.println("Details: " + details);
-        System.out.println("User ID: " + userId);
-        System.out.println("Timestamp: " + timestamp);
-    }
-}
