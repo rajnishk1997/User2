@@ -1,17 +1,27 @@
-public RoleInfo getPermissionsForRole(int roleId) {
-        Role role = roleRepository.findById(roleId).orElseThrow(() -> new RuntimeException("Role not found"));
-        Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
-                .map(rolePermission -> new PermissionInfo(rolePermission.getPermission().getPermissionRid(), rolePermission.getPermission().getPermissionName()))
-                .collect(Collectors.toSet());
+package com.optum.util;
 
-        return new RoleInfo(role.getRoleRid(), role.getRoleName(), permissionInfos);
+import javax.persistence.AttributeConverter;
+import javax.persistence.Converter;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+@Converter(autoApply = true)
+public class LocalDateTimeAttributeConverter implements AttributeConverter<LocalDateTime, String> {
+
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm:ss");
+
+    @Override
+    public String convertToDatabaseColumn(LocalDateTime locDateTime) {
+        return locDateTime == null ? null : locDateTime.format(FORMATTER);
     }
-	
-	
-	 @GetMapping("/{roleId}/permissions")
-    public ResponseEntity<RoleInfo> getPermissionsForRole(@PathVariable int roleId) {
-        RoleInfo roleInfo = rolePermissionService.getPermissionsForRole(roleId);
-        return new ResponseEntity<>(roleInfo, HttpStatus.OK);
+
+    @Override
+    public LocalDateTime convertToEntityAttribute(String sqlTimestamp) {
+        return sqlTimestamp == null ? null : LocalDateTime.parse(sqlTimestamp, FORMATTER);
     }
-	
-	
+}
+
+
+  @Column(name = "timestamp")
+    private LocalDateTime timestamp;
