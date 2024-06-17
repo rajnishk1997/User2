@@ -1,56 +1,43 @@
-@Transactional
-public List<RoleInfo> mapPermissionsToRoles(List<RoleInfo> roleInfos, int currentUserRid) {
-    List<RoleInfo> updatedRoleInfos = new ArrayList<>();
+@RestController
+@RequestMapping("/roles")
+public class RoleController {
 
-    for (RoleInfo roleInfo : roleInfos) {
-        Role role = roleRepository.findById(roleInfo.getRoleRid())
-                                  .orElseThrow(() -> new RuntimeException("Role not found"));
+    @Autowired
+    private RolePermissionService rolePermissionService;
 
-        // Get the new permissions for this role
-        Set<PermissionInfo> permissionInfos = roleInfo.getPermissions();
+    @PostMapping("/{roleId}/permissions")
+    public ResponseEntity<RoleInfo> mapPermissionsToRole(
+            @PathVariable int roleId,
+            @RequestBody RoleInfo roleInfo,
+            Principal principal) {
 
-        // Retrieve or create new Permission entities
-        Set<Permission> newPermissions = permissionInfos.stream()
-                .map(permissionInfo -> {
-                    if (permissionInfo.getPermissionRid() != null) {
-                        return permissionRepository.findById(permissionInfo.getPermissionRid())
-                                .orElseThrow(() -> new RuntimeException("Permission not found with ID: " + permissionInfo.getPermissionRid()));
-                    } else {
-                        // Handle case where PermissionRid is null (e.g., creating new permissions)
-                        Permission permission = new Permission();
-                        permission.setPermissionName(permissionInfo.getPermissionName());
-                        return permissionRepository.save(permission);
-                    }
-                })
-                .collect(Collectors.toSet());
+        try {
+            int currentUserRid = getCurrentUserRid(principal); // Method to get current user ID
 
-        // Clear existing RolePermission entries
-        rolePermissionRepository.deleteByRole(role);
+            // Extract permissions from RoleInfo
+            List<PermissionInfo> permissionInfos = new ArrayList<>(roleInfo.getPermissions());
 
-        // Create new RolePermission entries
-        Set<RolePermission> rolePermissions = newPermissions.stream()
-                .map(permission -> new RolePermission(role, permission, currentUserRid))
-                .collect(Collectors.toSet());
+            // Convert PermissionInfo to PermissionDTO for service method
+            List<PermissionDTO> permissionDTOs = permissionInfos.stream()
+                    .map(permissionInfo -> new PermissionDTO(permissionInfo.getPermissionRid(), permissionInfo.getPermissionName()))
+                    .collect(Collectors.toList());
 
-        // Set the new RolePermission entries to the role
-        role.setRolePermissions(rolePermissions);
-        roleRepository.save(role);
+            // Call service method to map permissions to role
+            RoleInfo updatedRoleInfo = rolePermissionService.mapPermissionsToRole(roleId, permissionDTOs, currentUserRid);
 
-        // Collect permission infos for the updated RoleInfo
-        Set<PermissionInfo> updatedPermissionInfos = newPermissions.stream()
-                .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
-                .collect(Collectors.toSet());
-
-        // Create and add updated RoleInfo to the list
-        updatedRoleInfos.add(new RoleInfo(role.getRoleRid(), role.getRoleName(), updatedPermissionInfos));
-
-        // Log the audit trail for this role update
-        String permissionDetails = updatedPermissionInfos.stream()
-                .map(permissionInfo -> String.format("%s (ID: %d)", permissionInfo.getPermissionName(), permissionInfo.getPermissionRid()))
-                .collect(Collectors.joining(", "));
-        String logDetails = String.format("Role Name: %s and Associated Permissions: %s", role.getRoleName(), permissionDetails);
-        logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", logDetails, currentUserRid, LocalDateTime.now());
+            return ResponseEntity.ok(updatedRoleInfo);
+        } catch (Exception e) {
+            // Handle exceptions
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                 .body(null); // You can return an error response or handle differently as needed
+        }
     }
 
-    return updatedRoleInfos;
+    // Helper method to get current user ID from Principal
+    private int getCurrentUserRid(Principal principal) {
+        // Implementation depends on how you retrieve the current user's ID
+        // For example:
+        // return userService.findUserIdByUsername(principal.getName());
+        return 0; // Placeholder, replace with actual logic
+    }
 }
