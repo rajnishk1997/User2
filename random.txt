@@ -1,22 +1,60 @@
-public class PermissionRequest {
-    private int currentUserRid;
-    private List<PermissionInfo> permissionInfoList;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
-    // Getters and setters
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
-    public int getCurrentUserRid() {
-        return currentUserRid;
+@RestController
+public class RoleController {
+
+    private final RolePermissionService rolePermissionService;
+
+    public RoleController(RolePermissionService rolePermissionService) {
+        this.rolePermissionService = rolePermissionService;
     }
 
-    public void setCurrentUserRid(int currentUserRid) {
-        this.currentUserRid = currentUserRid;
+    @PostMapping("/permissions/{roleId}")
+    public ResponseEntity<Void> mapPermissionsToRole(@PathVariable int roleId, @RequestBody Map<String, Object> request) {
+        int currentUserRid = (Integer) request.get("currentUserRid");
+        List<Map<String, Object>> permissions = (List<Map<String, Object>>) request.get("permissionInfoList");
+
+        // Extract permission IDs from the list of permissions
+        List<Integer> permissionIds = permissions.stream()
+                .map(permission -> (Integer) permission.get("permissionRid"))
+                .collect(Collectors.toList());
+
+        CompletableFuture.runAsync(() -> {
+            Role updatedRole = rolePermissionService.mapPermissionsToRole(roleId, permissionIds);
+
+            Set<PermissionInfo> permissionInfo = updatedRole.getPermissions().stream()
+                    .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
+                    .collect(Collectors.toSet());
+
+            // Convert permissionInfo to a string for logging
+            String permissionDetails = permissionInfo.stream()
+                    .map(PermissionInfo::toString)
+                    .collect(Collectors.joining(", "));
+
+            // Log the audit trail
+            logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", "Mapped permissions to role: " + permissionDetails, currentUserRid, LocalDateTime.now());
+        });
+
+        return ResponseEntity.ok().build();
     }
 
-    public List<PermissionInfo> getPermissionInfoList() {
-        return permissionInfoList;
-    }
-
-    public void setPermissionInfoList(List<PermissionInfo> permissionInfoList) {
-        this.permissionInfoList = permissionInfoList;
+    private void logAuditTrailWithUsername(String action, String status, String details, int userId, LocalDateTime timestamp) {
+        // Implementation of logging the audit trail
+        System.out.println("Action: " + action);
+        System.out.println("Status: " + status);
+        System.out.println("Details: " + details);
+        System.out.println("User ID: " + userId);
+        System.out.println("Timestamp: " + timestamp);
     }
 }
