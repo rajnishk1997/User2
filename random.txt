@@ -1,30 +1,56 @@
- @GetMapping("/all-with-permissions")
-    public ResponseEntity<List<RoleInfo>> getAllRolesWithPermissions() {
-        try {
-            List<RoleInfo> rolesWithPermissions = roleService.getAllRolesWithPermissions();
-            return new ResponseEntity<>(rolesWithPermissions, HttpStatus.OK);
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-	
-	 public List<RoleInfo> getAllRolesWithPermissions() {
-        try {
-            List<Role> roles = roleRepository.findAll();
+@Transactional
+public List<RoleInfo> mapPermissionsToRoles(List<RoleInfo> roleInfos, int currentUserRid) {
+    List<RoleInfo> updatedRoleInfos = new ArrayList<>();
 
-            return roles.stream()
-                    .map(role -> new RoleInfo(
-                            role.getRoleRid(),
-                            role.getRoleName(),
-                            role.getRolePermissions().stream()
-                                    .map(rolePermission -> new PermissionInfo(
-                                            rolePermission.getPermission().getPermissionRid(),
-                                            rolePermission.getPermission().getPermissionName()))
-                                    .collect(Collectors.toSet())))
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            throw new RuntimeException("Failed to fetch roles with permissions", e);
-        }
+    for (RoleInfo roleInfo : roleInfos) {
+        Role role = roleRepository.findById(roleInfo.getRoleRid())
+                                  .orElseThrow(() -> new RuntimeException("Role not found"));
+
+        // Get the new permissions for this role
+        Set<PermissionInfo> permissionInfos = roleInfo.getPermissions();
+
+        // Retrieve or create new Permission entities
+        Set<Permission> newPermissions = permissionInfos.stream()
+                .map(permissionInfo -> {
+                    if (permissionInfo.getPermissionRid() != null) {
+                        return permissionRepository.findById(permissionInfo.getPermissionRid())
+                                .orElseThrow(() -> new RuntimeException("Permission not found with ID: " + permissionInfo.getPermissionRid()));
+                    } else {
+                        // Handle case where PermissionRid is null (e.g., creating new permissions)
+                        Permission permission = new Permission();
+                        permission.setPermissionName(permissionInfo.getPermissionName());
+                        return permissionRepository.save(permission);
+                    }
+                })
+                .collect(Collectors.toSet());
+
+        // Clear existing RolePermission entries
+        rolePermissionRepository.deleteByRole(role);
+
+        // Create new RolePermission entries
+        Set<RolePermission> rolePermissions = newPermissions.stream()
+                .map(permission -> new RolePermission(role, permission, currentUserRid))
+                .collect(Collectors.toSet());
+
+        // Set the new RolePermission entries to the role
+        role.setRolePermissions(rolePermissions);
+        roleRepository.save(role);
+
+        // Collect permission infos for the updated RoleInfo
+        Set<PermissionInfo> updatedPermissionInfos = newPermissions.stream()
+                .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
+                .collect(Collectors.toSet());
+
+        // Create and add updated RoleInfo to the list
+        updatedRoleInfos.add(new RoleInfo(role.getRoleRid(), role.getRoleName(), updatedPermissionInfos));
+
+        // Log the audit trail for this role update
+        String permissionDetails = updatedPermissionInfos.stream()
+                .map(permissionInfo -> String.format("%s (ID: %d)", permissionInfo.getPermissionName(), permissionInfo.getPermissionRid()))
+                .collect(Collectors.joining(", "));
+        String logDetails = String.format("Role Name: %s and Associated Permissions: %s", role.getRoleName(), permissionDetails);
+        logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", logDetails, currentUserRid, LocalDateTime.now());
     }
+
+    return updatedRoleInfos;
+}
