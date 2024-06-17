@@ -1,27 +1,22 @@
-package com.optum.util;
+public class PermissionRequest {
+    private int currentUserRid;
+    private List<PermissionInfo> permissionInfoList;
 
-import javax.persistence.AttributeConverter;
-import javax.persistence.Converter;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+    // Getters and setters
 
-@Converter(autoApply = true)
-public class LocalDateTimeAttributeConverter implements AttributeConverter<LocalDateTime, String> {
-
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm:ss");
-
-    @Override
-    public String convertToDatabaseColumn(LocalDateTime locDateTime) {
-        return locDateTime == null ? null : locDateTime.format(FORMATTER);
+    public int getCurrentUserRid() {
+        return currentUserRid;
     }
 
-    @Override
-    public LocalDateTime convertToEntityAttribute(String sqlTimestamp) {
-        return sqlTimestamp == null ? null : LocalDateTime.parse(sqlTimestamp, FORMATTER);
+    public void setCurrentUserRid(int currentUserRid) {
+        this.currentUserRid = currentUserRid;
+    }
+
+    public List<PermissionInfo> getPermissionInfoList() {
+        return permissionInfoList;
+    }
+
+    public void setPermissionInfoList(List<PermissionInfo> permissionInfoList) {
+        this.permissionInfoList = permissionInfoList;
     }
 }
-
-
-  @Column(name = "timestamp")
-    private LocalDateTime timestamp;
