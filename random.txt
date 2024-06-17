@@ -1,56 +1,30 @@
- @Transactional
-    public RoleInfo mapPermissionsToRole(int roleId, List<PermissionDTO> permissionDTOs, int currentUserRid) {
-        Role role = roleRepository.findById(roleId).orElseThrow(() -> new RuntimeException("Role not found"));
-
-        // Get the new permissions
-        Set<Permission> newPermissions = permissionDTOs.stream()
-                .map(dto -> permissionRepository.findById(dto.getPermissionRid()).orElseThrow(() -> new RuntimeException("Permission not found")))
-                .collect(Collectors.toSet());
-
-        // Clear existing RolePermission entries
-        rolePermissionRepository.deleteByRole(role);
-
-        // Create new RolePermission entries
-        Set<RolePermission> rolePermissions = newPermissions.stream()
-                .map(permission -> new RolePermission(role, permission, currentUserRid))
-                .collect(Collectors.toSet());
-
-        // Set the new RolePermission entries to the role
-        role.setRolePermissions(rolePermissions);
-        roleRepository.save(role);
-
-        // Collect permission names for logging
-        List<String> permissionNames = newPermissions.stream()
-                .map(Permission::getPermissionName)
-                .collect(Collectors.toList());
-
-        // Format the permission details for logging
-        String permissionDetails = newPermissions.stream()
-                .map(permission -> String.format("%s (ID: %d)", permission.getPermissionName(), permission.getPermissionRid()))
-                .collect(Collectors.joining(", "));
-
-        // Log the audit trail
-        String logDetails = String.format("Role Name: %s and Associated Permissions: %s", role.getRoleName(), permissionDetails);
-        logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", logDetails, currentUserRid, LocalDateTime.now());
-
-        // Return the updated RoleInfo
-        return new RoleInfo(role.getRoleRid(), role.getRoleName(), rolePermissions.stream()
-                .map(rolePermission -> new PermissionInfo(rolePermission.getPermission().getPermissionRid(), rolePermission.getPermission().getPermissionName()))
-                .collect(Collectors.toSet()));
-    }
-
-
- public RolePermission(Role role, Permission permission, int createdBy) {
-        this.role = role;
-        this.permission = permission;
-        this.createdBy = createdBy;
-        this.createdDate = new Date();
+ @GetMapping("/all-with-permissions")
+    public ResponseEntity<List<RoleInfo>> getAllRolesWithPermissions() {
+        try {
+            List<RoleInfo> rolesWithPermissions = roleService.getAllRolesWithPermissions();
+            return new ResponseEntity<>(rolesWithPermissions, HttpStatus.OK);
+        } catch (Exception e) {
+            // Log the exception or handle it as needed
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 	
-	
-	 @Modifying
-    @Transactional
-    @Query("DELETE FROM RolePermission rp WHERE rp.role = :role")
-    void deleteByRole(@Param("role") Role role);
-	 @Query("DELETE FROM RolePermission rp WHERE rp.role = :role")
-    void deleteByRole(@Param("role") Role role);
+	 public List<RoleInfo> getAllRolesWithPermissions() {
+        try {
+            List<Role> roles = roleRepository.findAll();
+
+            return roles.stream()
+                    .map(role -> new RoleInfo(
+                            role.getRoleRid(),
+                            role.getRoleName(),
+                            role.getRolePermissions().stream()
+                                    .map(rolePermission -> new PermissionInfo(
+                                            rolePermission.getPermission().getPermissionRid(),
+                                            rolePermission.getPermission().getPermissionName()))
+                                    .collect(Collectors.toSet())))
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            // Log the exception or handle it as needed
+            throw new RuntimeException("Failed to fetch roles with permissions", e);
+        }
+    }
