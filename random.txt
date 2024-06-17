@@ -1,19 +1,31 @@
  @Transactional
     public RoleInfo mapPermissionsToRole(int roleId, List<PermissionDTO> permissionDTOs, int currentUserRid) {
         Role role = roleRepository.findById(roleId).orElseThrow(() -> new RuntimeException("Role not found"));
-        Set<Permission> permissions = permissionDTOs.stream()
+
+        // Get the new permissions
+        Set<Permission> newPermissions = permissionDTOs.stream()
                 .map(dto -> permissionRepository.findById(dto.getPermissionRid()).orElseThrow(() -> new RuntimeException("Permission not found")))
                 .collect(Collectors.toSet());
 
-        role.setPermissions(permissions);
+        // Clear existing RolePermission entries
+        rolePermissionRepository.deleteByRole(role);
+
+        // Create new RolePermission entries
+        Set<RolePermission> rolePermissions = newPermissions.stream()
+                .map(permission -> new RolePermission(role, permission, currentUserRid))
+                .collect(Collectors.toSet());
+
+        // Set the new RolePermission entries to the role
+        role.setRolePermissions(rolePermissions);
         roleRepository.save(role);
 
-        List<String> permissionNames = permissions.stream()
+        // Collect permission names for logging
+        List<String> permissionNames = newPermissions.stream()
                 .map(Permission::getPermissionName)
                 .collect(Collectors.toList());
 
         // Format the permission details for logging
-        String permissionDetails = permissions.stream()
+        String permissionDetails = newPermissions.stream()
                 .map(permission -> String.format("%s (ID: %d)", permission.getPermissionName(), permission.getPermissionRid()))
                 .collect(Collectors.joining(", "));
 
@@ -21,7 +33,24 @@
         String logDetails = String.format("Role Name: %s and Associated Permissions: %s", role.getRoleName(), permissionDetails);
         logAuditTrailWithUsername("MAP_PERMISSIONS", "SUCCESS", logDetails, currentUserRid, LocalDateTime.now());
 
-        return new RoleInfo(role.getRoleRid(), role.getRoleName(), permissions.stream()
-                .map(permission -> new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName()))
+        // Return the updated RoleInfo
+        return new RoleInfo(role.getRoleRid(), role.getRoleName(), rolePermissions.stream()
+                .map(rolePermission -> new PermissionInfo(rolePermission.getPermission().getPermissionRid(), rolePermission.getPermission().getPermissionName()))
                 .collect(Collectors.toSet()));
     }
+
+
+ public RolePermission(Role role, Permission permission, int createdBy) {
+        this.role = role;
+        this.permission = permission;
+        this.createdBy = createdBy;
+        this.createdDate = new Date();
+    }
+	
+	
+	 @Modifying
+    @Transactional
+    @Query("DELETE FROM RolePermission rp WHERE rp.role = :role")
+    void deleteByRole(@Param("role") Role role);
+	 @Query("DELETE FROM RolePermission rp WHERE rp.role = :role")
+    void deleteByRole(@Param("role") Role role);
