@@ -63,4 +63,7 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 	  @Query("SELECT new com.opyum.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.email) " +
            "FROM User u WHERE u.isNewUser = true AND u.manager.userRid = :managerId")
     List<UserInfo> findNewUsersByManagerId(@Param("managerId") int managerId);
+
+	 @Query("SELECT u FROM User u WHERE u.manager.userRid = :managerId AND u.isNewUser = false")
+    List<User> findByManagerUserRidAndIsNewUserFalse(@Param("managerId") int managerId);
 }

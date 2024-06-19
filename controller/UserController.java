@@ -30,6 +30,7 @@ import com.optum.service.RoleService;
 import com.optum.service.UserService;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -357,6 +358,76 @@ public class UserController {
             throw new RuntimeException("Failed to fetch managers list", ex);
         }
     }
+    
+    @PutMapping("/activate/{userName}")
+    public ResponseEntity<ReqRes> activateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+        Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
+        long startTime = System.currentTimeMillis();
+        try {
+            // Fetch the username of the user performing the action
+            String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
+
+            ReqRes response = userService.activateUser(userName);
+            if (response.getStatusCode() == 200) {
+                String details = String.format("Activated User: %s, Activated By: %s", userName, currentUserUsername);
+                auditTrailService.logAuditTrailWithUsername("User Activate", "SUCCESS", details, currentUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while activating the user"));
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+    
+    @GetMapping("/users/reports/{managerId}")
+    public ResponseEntity<List<UserDTO>> getUsersReportingToManager(@PathVariable int managerId) {
+        long startTime = System.currentTimeMillis();
+        try {
+            List<UserDTO> users = userService.getUsersReportingToManager(managerId);
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Collections.singletonList(new UserDTO()));
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+
+    @PutMapping("/deactivateManager/{userName}")
+    public ResponseEntity<ReqRes> deactivateManager(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+        Integer adminUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current admin ID from context/session
+        long startTime = System.currentTimeMillis();
+        try {
+            // Fetch the username of the admin performing the action
+            String adminUsername = userDao.findUserNameByUserRid(adminUserRid);
+
+            ReqRes response = userService.deactivateManager(userName, adminUserRid);
+            if (response.getStatusCode() == 200) {
+                String details = String.format("Deactivated Manager: %s, Deactivated By: %s", userName, adminUsername);
+                auditTrailService.logAuditTrailWithUsername("Manager Deactivate", "SUCCESS", details, adminUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the manager"));
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+
+
 
 	@GetMapping({ "/forAdmin" })
 	@PreAuthorize("hasRole('Admin')")

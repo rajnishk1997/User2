@@ -51,8 +51,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
-    @PersistenceContext
-    private EntityManager entityManager;
+	@PersistenceContext
+	private EntityManager entityManager;
 
 	private static final Logger logger = LogManager.getLogger(UserService.class);
 
@@ -189,70 +189,67 @@ public class UserService {
 
 	@Transactional
 	public RegistrationResponse<User> registerNewUser(UserRequestDTO userRequestDTO) {
-	    try {
-	        
-	        logger.debug("Registering new user with details: {}", userRequestDTO);
+		try {
 
-	        // Check if user already exists by email
-	        if (userDao.existsByUserEmail(userRequestDTO.getUserEmail())) {
-	            throw new IllegalArgumentException("User already exists with email: " + userRequestDTO.getUserEmail());
-	        }
+			logger.debug("Registering new user with details: {}", userRequestDTO);
 
-	        // Retrieve existing roles and their permissions from the database
-	        Set<Role> userRoles = fetchRoles(userRequestDTO.getRoles());
+			// Check if user already exists by email
+			if (userDao.existsByUserEmail(userRequestDTO.getUserEmail())) {
+				throw new IllegalArgumentException("User already exists with email: " + userRequestDTO.getUserEmail());
+			}
 
-	        // Create User entity
-	        User user = mapToUserEntity(userRequestDTO, userRoles);
+			// Retrieve existing roles and their permissions from the database
+			Set<Role> userRoles = fetchRoles(userRequestDTO.getRoles());
 
-	        // Encrypt the password
-	        String plainPassword = generatePlainPassword(); 
-	        user.setUserPassword(passwordEncoder.encode(plainPassword));
-	        user.setUserPlainPassword(plainPassword);
+			// Create User entity
+			User user = mapToUserEntity(userRequestDTO, userRoles);
 
-	        // Set the manager if provided
-	        if (userRequestDTO.getManagerId() != null) {
-	            User manager = userDao.findById(userRequestDTO.getManagerId()).orElse(null);
-	            user.setManager(manager);
-	        }
+			// Encrypt the password
+			String plainPassword = generatePlainPassword();
+			user.setUserPassword(passwordEncoder.encode(plainPassword));
+			user.setUserPlainPassword(plainPassword);
 
-	        // Save the user
-	        User savedUser = userDao.save(user);
+			// Set the manager if provided
+			if (userRequestDTO.getManagerId() != null) {
+				User manager = userDao.findById(userRequestDTO.getManagerId()).orElse(null);
+				user.setManager(manager);
+			}
 
-	        // Create and return the registration response
-	        return new RegistrationResponse<>(HttpStatus.CREATED.value(), null, "Successfully Registered User",
-	                savedUser.getUserName(), savedUser.getUserPlainPassword());
-	    } catch (IllegalArgumentException e) {
-	        logger.error("Error registering new user: " + e.getMessage());
-	        throw e;
-	    } catch (Exception e) {
-	        logger.error("An error occurred while registering the user", e);
-	        throw new UserRegistrationException("An error occurred while registering the user", e);
-	    }
+			// Save the user
+			User savedUser = userDao.save(user);
+
+			// Create and return the registration response
+			return new RegistrationResponse<>(HttpStatus.CREATED.value(), null, "Successfully Registered User",
+					savedUser.getUserName(), savedUser.getUserPlainPassword());
+		} catch (IllegalArgumentException e) {
+			logger.error("Error registering new user: " + e.getMessage());
+			throw e;
+		} catch (Exception e) {
+			logger.error("An error occurred while registering the user", e);
+			throw new UserRegistrationException("An error occurred while registering the user", e);
+		}
 	}
 
 	private Set<Role> fetchRoles(Set<RoleDTO> roleDTOs) {
-	    Set<String> roleNames = roleDTOs.stream()
-	                                    .map(RoleDTO::getRoleName)
-	                                    .collect(Collectors.toSet());
-	    return new HashSet<>(roleDao.findByRoleNameIn(roleNames));
+		Set<String> roleNames = roleDTOs.stream().map(RoleDTO::getRoleName).collect(Collectors.toSet());
+		return new HashSet<>(roleDao.findByRoleNameIn(roleNames));
 	}
 
 	private User mapToUserEntity(UserRequestDTO dto, Set<Role> roles) {
-	    User user = new User();
-	    user.setUserFirstName(dto.getUserFirstName());
-	    user.setUserLastName(dto.getUserLastName());
-	    user.setUserEmail(dto.getUserEmail());
-	    user.setCurrentUserId(dto.getCurrentUserId());
-	    user.setRoles(roles);
-	    user.setUserName(generateUserName(dto.getUserFirstName(), dto.getUserLastName()));
-	    Date currentDate = new Date();
-	    user.setCreatedDate(currentDate);
-	    user.setCreatedBy(dto.getCurrentUserId());
-	    user.setModifiedDate(currentDate);
-	    user.setModifiedBy(dto.getCurrentUserId());
-	    return user;
+		User user = new User();
+		user.setUserFirstName(dto.getUserFirstName());
+		user.setUserLastName(dto.getUserLastName());
+		user.setUserEmail(dto.getUserEmail());
+		user.setCurrentUserId(dto.getCurrentUserId());
+		user.setRoles(roles);
+		user.setUserName(generateUserName(dto.getUserFirstName(), dto.getUserLastName()));
+		Date currentDate = new Date();
+		user.setCreatedDate(currentDate);
+		user.setCreatedBy(dto.getCurrentUserId());
+		user.setModifiedDate(currentDate);
+		user.setModifiedBy(dto.getCurrentUserId());
+		return user;
 	}
-
 
 	public String generateUserName(String firstName, String lastName) {
 		// Validate input parameters
@@ -317,112 +314,110 @@ public class UserService {
 		return fullName.toString();
 	}
 
-	
-	public String generateAuditTrailDetails(UserSnapshot oldState, UserSnapshot newState, UserRequestDTO userRequestDTO) {
-	    StringBuilder details = new StringBuilder();
+	public String generateAuditTrailDetails(UserSnapshot oldState, UserSnapshot newState,
+			UserRequestDTO userRequestDTO) {
+		StringBuilder details = new StringBuilder();
 
-	    // Check and log changes for each field
-	    if (!Objects.equals(oldState.getFirstName(), newState.getFirstName())) {
-	        details.append(String.format("Old First Name: %s, New First Name: %s; ", oldState.getFirstName(), newState.getFirstName()));
-	    }
-	    if (!Objects.equals(oldState.getLastName(), newState.getLastName())) {
-	        details.append(String.format("Old Last Name: %s, New Last Name: %s; ", oldState.getLastName(), newState.getLastName()));
-	    }
-	    if (!Objects.equals(oldState.getEmail(), newState.getEmail())) {
-	        details.append(String.format("Old Email: %s, New Email: %s; ", oldState.getEmail(), newState.getEmail()));
-	    }
+		// Check and log changes for each field
+		if (!Objects.equals(oldState.getFirstName(), newState.getFirstName())) {
+			details.append(String.format("Old First Name: %s, New First Name: %s; ", oldState.getFirstName(),
+					newState.getFirstName()));
+		}
+		if (!Objects.equals(oldState.getLastName(), newState.getLastName())) {
+			details.append(String.format("Old Last Name: %s, New Last Name: %s; ", oldState.getLastName(),
+					newState.getLastName()));
+		}
+		if (!Objects.equals(oldState.getEmail(), newState.getEmail())) {
+			details.append(String.format("Old Email: %s, New Email: %s; ", oldState.getEmail(), newState.getEmail()));
+		}
 
-	    if (!Objects.equals(oldState.getRoles(), newState.getRoles())) {
-	        details.append(String.format("Old Roles: %s, New Roles: %s; ",
-	                String.join(", ", oldState.getRoles()), String.join(", ", newState.getRoles())));
-	    }
+		if (!Objects.equals(oldState.getRoles(), newState.getRoles())) {
+			details.append(String.format("Old Roles: %s, New Roles: %s; ", String.join(", ", oldState.getRoles()),
+					String.join(", ", newState.getRoles())));
+		}
 
-	    if (!Objects.equals(oldState.getManagerName(), newState.getManagerName())) {
-	        details.append(String.format("Old Manager Name: %s, New Manager Name: %s; ",
-	                oldState.getManagerName(), newState.getManagerName()));
-	    }
+		if (!Objects.equals(oldState.getManagerName(), newState.getManagerName())) {
+			details.append(String.format("Old Manager Name: %s, New Manager Name: %s; ", oldState.getManagerName(),
+					newState.getManagerName()));
+		}
 
-	    return details.toString();
+		return details.toString();
 	}
-
 
 	@Transactional
 	public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
-	    logger.info("Updating user with username: {}", userName);
-	    Optional<User> optionalUser = userDao.findByUserName(userName);
-	    if (!optionalUser.isPresent()) {
-	        logger.warn("User not found with username: {}", userName);
-	        return new ReqRes(404, "Not Found", "User not found");
-	    }
+		logger.info("Updating user with username: {}", userName);
+		Optional<User> optionalUser = userDao.findByUserName(userName);
+		if (!optionalUser.isPresent()) {
+			logger.warn("User not found with username: {}", userName);
+			return new ReqRes(404, "Not Found", "User not found");
+		}
 
-	    User user = optionalUser.get();
+		User user = optionalUser.get();
 
-	    // Update user fields
-	    logger.info("Updating user fields for username: {}", userName);
-	    user.setUserFirstName(userRequestDTO.getUserFirstName());
-	    user.setUserLastName(userRequestDTO.getUserLastName());
-	    user.setUserEmail(userRequestDTO.getUserEmail());
+		// Update user fields
+		logger.info("Updating user fields for username: {}", userName);
+		user.setUserFirstName(userRequestDTO.getUserFirstName());
+		user.setUserLastName(userRequestDTO.getUserLastName());
+		user.setUserEmail(userRequestDTO.getUserEmail());
 
-	    // Set the manager if provided
-	    if (userRequestDTO.getManagerId() != null) {
-	        User manager = userDao.findById(userRequestDTO.getManagerId()).orElse(null);
-	        user.setManager(manager);
-	        user.setManagerName(userRequestDTO.getManagerName());
-	    }
+		// Set the manager if provided
+		if (userRequestDTO.getManagerId() != null) {
+			User manager = userDao.findById(userRequestDTO.getManagerId()).orElse(null);
+			user.setManager(manager);
+			user.setManagerName(userRequestDTO.getManagerName());
+		}
 
-	    // Get new roles from the request
-	    Set<Role> newRoles = new HashSet<>();
-	    for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
-	        Role role = roleDao.findByRoleRid(roleDTO.getRoleRid())
-	                .orElseThrow(() -> {
-	                    logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
-	                    return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
-	                });
-	        newRoles.add(role);
-	    }
+		// Get new roles from the request
+		Set<Role> newRoles = new HashSet<>();
+		for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
+			Role role = roleDao.findByRoleRid(roleDTO.getRoleRid()).orElseThrow(() -> {
+				logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
+				return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
+			});
+			newRoles.add(role);
+		}
 
-	    logger.info("New roles prepared for user: {}", userName);
+		logger.info("New roles prepared for user: {}", userName);
 
-	    // Determine roles to be removed
-	    Set<UserRole> rolesToRemove = new HashSet<>();
-	    for (UserRole userRole : user.getUserRoles()) {
-	        if (!newRoles.contains(userRole.getRole())) {
-	            rolesToRemove.add(userRole);
-	            logger.info("Role marked for removal: {}", userRole.getRole());
-	        }
-	    }
+		// Determine roles to be removed
+		Set<UserRole> rolesToRemove = new HashSet<>();
+		for (UserRole userRole : user.getUserRoles()) {
+			if (!newRoles.contains(userRole.getRole())) {
+				rolesToRemove.add(userRole);
+				logger.info("Role marked for removal: {}", userRole.getRole());
+			}
+		}
 
-	    // Remove roles not present in newRoles
-	    logger.info("Removing roles not present in newRoles for user: {}", userName);
-	    for (UserRole userRole : rolesToRemove) {
-	        user.removeUserRole(userRole); // Remove from user's collection
-	        userRole.setUser(null); // Disassociate from user
-	        userRoleDao.delete(userRole); // Delete from database
-	        logger.info("Removed UserRole: {}", userRole);
-	    }
+		// Remove roles not present in newRoles
+		logger.info("Removing roles not present in newRoles for user: {}", userName);
+		for (UserRole userRole : rolesToRemove) {
+			user.removeUserRole(userRole); // Remove from user's collection
+			userRole.setUser(null); // Disassociate from user
+			userRoleDao.delete(userRole); // Delete from database
+			logger.info("Removed UserRole: {}", userRole);
+		}
 
-	    // Save changes to the database to ensure roles are removed
-	    userRoleDao.flush();
-	    userDao.flush(); // Ensure that deletions are flushed to the database
+		// Save changes to the database to ensure roles are removed
+		userRoleDao.flush();
+		userDao.flush(); // Ensure that deletions are flushed to the database
 
-	    // Add new roles
-	    logger.info("Adding new roles for user: {}", userName);
-	    for (Role role : newRoles) {
-	        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
-	            user.addRole(role);
-	            logger.info("Role added: {}", role);
-	        }
-	    }
+		// Add new roles
+		logger.info("Adding new roles for user: {}", userName);
+		for (Role role : newRoles) {
+			if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
+				user.addRole(role);
+				logger.info("Role added: {}", role);
+			}
+		}
 
-	    // Save updated user
-	    userDao.save(user);
-	    logger.info("User updated successfully: {}", userName);
+		// Save updated user
+		userDao.save(user);
+		logger.info("User updated successfully: {}", userName);
 
-	    return new ReqRes(200, null, "User updated successfully");
+		return new ReqRes(200, null, "User updated successfully");
 	}
 
-	
-	
 	public Optional<User> updateUserByUserId(Integer userId, User updatedUser) {
 		Optional<User> optionalUser = userDao.findByUserRid(userId);
 		if (optionalUser.isPresent()) {
@@ -478,35 +473,29 @@ public class UserService {
 			return Optional.of(new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", ""));
 		}
 	}
-	
 
-	
+	public List<UserInfo> getAllUsers() {
+		try {
+			return userDao.findAllUsersWithoutRoles();
+		} catch (Exception e) {
+			// Log the exception or handle it as needed
+			return Collections.emptyList(); // Return an empty list in case of an error
+		}
+	}
 
-    public List<UserInfo> getAllUsers() {
-        try {
-            return userDao.findAllUsersWithoutRoles();
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            return Collections.emptyList(); // Return an empty list in case of an error
-        }
-    }
-
-    public List<UserInfo> searchUsersByKeyword(String keyword) {
-        try {
-            return userDao.searchUsersByKeywordWithoutRoles(keyword);
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            return Collections.emptyList(); // Return an empty list in case of an error
-        }
-    }
-	
-
+	public List<UserInfo> searchUsersByKeyword(String keyword) {
+		try {
+			return userDao.searchUsersByKeywordWithoutRoles(keyword);
+		} catch (Exception e) {
+			// Log the exception or handle it as needed
+			return Collections.emptyList(); // Return an empty list in case of an error
+		}
+	}
 
 	public List<User> findByUserName(String userName) {
 		Optional<User> userOptional = userDao.findByUserName(userName);
 		return userOptional.map(Collections::singletonList).orElseGet(Collections::emptyList);
 	}
-
 
 	@Transactional
 	public void saveUserWithRoles(User user, Set<Role> roles) {
@@ -528,13 +517,13 @@ public class UserService {
 	}
 
 	public UserDTO getUserByUsername(String username) {
-        try {
-            return userDao.findUserDetailsWithRolesByUsername(username);
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            return null; // Return null in case of an error
-        }
-    }
+		try {
+			return userDao.findUserDetailsWithRolesByUsername(username);
+		} catch (Exception e) {
+			// Log the exception or handle it as needed
+			return null; // Return null in case of an error
+		}
+	}
 
 	public UserDTO mapToUserDTO(User user) {
 		UserDTO userDTO = new UserDTO();
@@ -570,19 +559,13 @@ public class UserService {
 		permissionDTO.setPermissionName(permission.getPermissionName());
 		return permissionDTO;
 	}
-	
-	public UserInfo mapToUserInfo(User user) {
-	    return new UserInfo(
-	    		user.getUserRid(),
-	        user.getUserName(),
-	        user.getUserFirstName(),
-	        user.getUserLastName(),
-	        user.getUserEmail(),
-	        user.isActiveUser()
-	        
-	    );
-	}
 
+	public UserInfo mapToUserInfo(User user) {
+		return new UserInfo(user.getUserRid(), user.getUserName(), user.getUserFirstName(), user.getUserLastName(),
+				user.getUserEmail(), user.isActiveUser()
+
+		);
+	}
 
 	// Generate a plain password
 	private String generatePlainPassword() {
@@ -596,105 +579,155 @@ public class UserService {
 		return new BCryptPasswordEncoder().encode(plainPassword);
 	}
 
-	
 	@Transactional
 	public ReqRes deleteUserByUserName(String userName) {
-	    try {
-	        Optional<User> optionalUser = userDao.findByUserName(userName);
-	        if (!optionalUser.isPresent()) {
-	            return new ReqRes(404, "Not Found", "User not found");
-	        }
+		try {
+			Optional<User> optionalUser = userDao.findByUserName(userName);
+			if (!optionalUser.isPresent()) {
+				return new ReqRes(404, "Not Found", "User not found");
+			}
 
-	        User user = optionalUser.get();
+			User user = optionalUser.get();
 
-	        // Collect UserRole mappings for deletion
-	        Set<UserRole> userRolesToDelete = new HashSet<>(user.getUserRoles());
+			// Collect UserRole mappings for deletion
+			Set<UserRole> userRolesToDelete = new HashSet<>(user.getUserRoles());
 
-	        // Disassociate UserRole mappings
-	        user.getUserRoles().forEach(userRole -> userRole.setUser(null));
-	        user.getUserRoles().clear();
+			// Disassociate UserRole mappings
+			user.getUserRoles().forEach(userRole -> userRole.setUser(null));
+			user.getUserRoles().clear();
 
-	        // Delete UserRole mappings
-	        userRoleDao.deleteAll(userRolesToDelete);
-	        userRoleDao.flush(); // Ensure the deletions are flushed to the database
+			// Delete UserRole mappings
+			userRoleDao.deleteAll(userRolesToDelete);
+			userRoleDao.flush(); // Ensure the deletions are flushed to the database
 
-	        // Delete the user from the database
-	        userDao.delete(user);
+			// Delete the user from the database
+			userDao.delete(user);
 
-	        return new ReqRes(200, null, "User deleted successfully");
-	    } catch (Exception e) {
-	        // Log the error for debugging purposes
-	        logger.error("Error occurred while deleting user: {}", userName, e);
-	        // Return a response indicating an internal server error
-	        return new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
-	    }
+			return new ReqRes(200, null, "User deleted successfully");
+		} catch (Exception e) {
+			// Log the error for debugging purposes
+			logger.error("Error occurred while deleting user: {}", userName, e);
+			// Return a response indicating an internal server error
+			return new ReqRes(500, "Internal Server Error", "An error occurred while deleting the user");
+		}
 	}
 
 	public ReqRes deactivateUser(String userName) {
-        Optional<User> optionalUser = userDao.findByUserName(userName);
-        if (!optionalUser.isPresent()) {
-            return new ReqRes(404, "Not Found", "User not found");
-        }
-
-        User user = optionalUser.get();
-        user.setActiveUser(false);
-        userDao.save(user);
-        return new ReqRes(200, null, "User deactivated successfully");
-    }
-	
-	 @Transactional
-	    public User changePassword(String username, String newPassword) {
-	        Optional<User> userOptional = userDao.findByUserName(username);
-	        User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
-	        user.setUserPassword(passwordEncoder.encode(newPassword));
-	       // user.setFirstLogin(false);
-	       // user.setUserPlainPassword(null);
-	        return userDao.save(user);
-	    }
-	 
-	 @Transactional
-	    public User firstLoginChangePassword(String username, String newPassword) {
-	        Optional<User> userOptional = userDao.findByUserName(username);
-	        User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
-	        user.setUserPassword(passwordEncoder.encode(newPassword));
-	        user.setFirstLogin(false);
-	        user.setUserPlainPassword(null);
-	        return userDao.save(user);
-	    }
-	 
-	  public ReqRes acceptNewUser(String userName, UserRequestDTO userRequestDTO) {
-	        Optional<User> optionalUser = userDao.findByUserNameAndIsNewUserTrue(userName);
-	        if (optionalUser.isPresent()) {
-	            User user = optionalUser.get();
-	            user.setNewUser(false);
-	            user.setActiveUser(true);
-	            user.setFirstLogin(true);  // Mark as first login
-	            userDao.save(user);
-	            return new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
-	        } else {
-	            return new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "No new user found with the provided username");
-	        }
-	    }
-	  
-	  public void changePassword(User user, String newPassword) {
-	        user.setUserPassword(passwordEncoder.encode(newPassword));
-	        user.setFirstLogin(false);
-	        userDao.save(user);
-	    }
-	  
-	  public List<UserInfo> getUserInfosByRole(String roleName) {
-	        return userDao.findUserInfosByRoleName(roleName);
-	    }
-
-	    public List<UserInfo> getManagers() {
-	        return getUserInfosByRole("Manager");
-	    }
-
-		public List<UserInfo> getNewUsers(int managerId) {
-			  try {
-			        return userDao.findNewUsersByManagerId(managerId);
-			    } catch (Exception e) {
-			        return Collections.emptyList(); 
-			    }
+		Optional<User> optionalUser = userDao.findByUserName(userName);
+		if (!optionalUser.isPresent()) {
+			return new ReqRes(404, "Not Found", "User not found");
 		}
+
+		User user = optionalUser.get();
+		user.setActiveUser(false);
+		userDao.save(user);
+		return new ReqRes(200, null, "User deactivated successfully");
+	}
+
+	@Transactional
+	public User changePassword(String username, String newPassword) {
+		Optional<User> userOptional = userDao.findByUserName(username);
+		User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
+		user.setUserPassword(passwordEncoder.encode(newPassword));
+		// user.setFirstLogin(false);
+		// user.setUserPlainPassword(null);
+		return userDao.save(user);
+	}
+
+	@Transactional
+	public User firstLoginChangePassword(String username, String newPassword) {
+		Optional<User> userOptional = userDao.findByUserName(username);
+		User user = userOptional.orElseThrow(() -> new RuntimeException("User not found"));
+		user.setUserPassword(passwordEncoder.encode(newPassword));
+		user.setFirstLogin(false);
+		user.setUserPlainPassword(null);
+		return userDao.save(user);
+	}
+
+	public ReqRes acceptNewUser(String userName, UserRequestDTO userRequestDTO) {
+		Optional<User> optionalUser = userDao.findByUserNameAndIsNewUserTrue(userName);
+		if (optionalUser.isPresent()) {
+			User user = optionalUser.get();
+			user.setNewUser(false);
+			user.setActiveUser(true);
+			user.setFirstLogin(true); // Mark as first login
+			userDao.save(user);
+			return new ReqRes(HttpStatus.OK.value(), null, "User accepted successfully");
+		} else {
+			return new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found",
+					"No new user found with the provided username");
+		}
+	}
+
+	public void changePassword(User user, String newPassword) {
+		user.setUserPassword(passwordEncoder.encode(newPassword));
+		user.setFirstLogin(false);
+		userDao.save(user);
+	}
+
+	public List<UserInfo> getUserInfosByRole(String roleName) {
+		return userDao.findUserInfosByRoleName(roleName);
+	}
+
+	public List<UserInfo> getManagers() {
+		return getUserInfosByRole("Manager");
+	}
+
+	public List<UserInfo> getNewUsers(int managerId) {
+		try {
+			return userDao.findNewUsersByManagerId(managerId);
+		} catch (Exception e) {
+			return Collections.emptyList();
+		}
+	}
+
+	public ReqRes activateUser(String userName) {
+		Optional<User> optionalUser = userDao.findByUserName(userName);
+		if (!optionalUser.isPresent()) {
+			return new ReqRes(404, "Not Found", "User not found");
+		}
+
+		User user = optionalUser.get();
+		user.setActiveUser(true); // Activate the user
+		userDao.save(user);
+		return new ReqRes(200, null, "User activated successfully");
+	}
+
+	public List<UserDTO> getUsersReportingToManager(int managerId) {
+		List<User> users = userDao.findByManagerUserRidAndIsNewUserFalse(managerId);
+		return users.stream().map(this::mapToUserDTO).collect(Collectors.toList());
+	}
+
+	public ReqRes deactivateManager(String userName, int adminUserRid) {
+		Optional<User> optionalUser = userDao.findByUserName(userName);
+		if (!optionalUser.isPresent()) {
+			return new ReqRes(404, "Not Found", "Manager not found");
+		}
+
+		User manager = optionalUser.get();
+
+		// Check if the user is a manager
+		boolean isManager = manager.getUserRoles().stream()
+				.anyMatch(role -> role.getRole().getRoleName().equalsIgnoreCase("manager"));
+
+		if (!isManager) {
+			return new ReqRes(400, "Bad Request", "User is not a manager");
+		}
+
+		// Find users reporting to this manager
+		List<User> reportingUsers = userDao.findByManagerUserRidAndIsNewUserFalse(manager.getUserRid());
+
+		// Reassign these users to report to the admin
+		for (User reportingUser : reportingUsers) {
+			reportingUser.setManager(userDao.findById(adminUserRid).orElse(null));
+			userDao.save(reportingUser);
+		}
+
+		// Deactivate the manager
+		manager.setActiveUser(false);
+		userDao.save(manager);
+
+		return new ReqRes(200, null, "Manager deactivated successfully");
+	}
+
 }
