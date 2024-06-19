@@ -1,20 +1,38 @@
-@PostMapping("/{roleId}/permissions")
-public ResponseEntity<RoleInfo> mapPermissionsToRole(
-        @PathVariable int roleId,
-        @RequestBody Map<String, Object> requestBody) {
-
+@PutMapping("/activate/{userName}")
+public ResponseEntity<ReqRes> activateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+    Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
+    long startTime = System.currentTimeMillis();
     try {
-        int currentUserRid = (int) requestBody.get("currentUserRid"); // Extract currentUserRid from top level
+        // Fetch the username of the user performing the action
+        String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
 
-        ObjectMapper mapper = new ObjectMapper();
-        List<RoleInfo> roleInfoList = mapper.convertValue(requestBody.get("roles"), new TypeReference<List<RoleInfo>>() {});
-
-        RoleInfo updatedRoleInfo = rolePermissionService.mapPermissionsToRole(roleId, roleInfoList, currentUserRid);
-
-        return ResponseEntity.ok(updatedRoleInfo);
+        ReqRes response = userService.activateUser(userName);
+        if (response.getStatusCode() == 200) {
+            String details = String.format("Activated User: %s, Activated By: %s", userName, currentUserUsername);
+            auditTrailService.logAuditTrailWithUsername("User Activate", "SUCCESS", details, currentUserRid);
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        }
     } catch (Exception e) {
-        // Handle exceptions
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                             .body(null); // You can return an error response or handle differently as needed
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while activating the user"));
+    } finally {
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        logger.info("Action performed in " + duration + "ms");
     }
+}
+
+
+public ReqRes activateUser(String userName) {
+    Optional<User> optionalUser = userDao.findByUserName(userName);
+    if (!optionalUser.isPresent()) {
+        return new ReqRes(404, "Not Found", "User not found");
+    }
+
+    User user = optionalUser.get();
+    user.setActiveUser(true); // Activate the user
+    userDao.save(user);
+    return new ReqRes(200, null, "User activated successfully");
 }
