@@ -284,15 +284,15 @@ public class UserController {
         }
     }
     
-    @PutMapping("/deactivate/{userName}")
-    public ResponseEntity<ReqRes> deactivateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+    @PutMapping("/deactivate-general-user/{userName}")
+    public ResponseEntity<ReqRes> deactivateGeneralUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
         Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
         long startTime = System.currentTimeMillis();
         try {
             // Fetch the username of the user performing the action
             String currentUserUsername = userDao.findUserNameByUserRid(currentUserRid);
 
-            ReqRes response = userService.deactivateUser(userName);
+            ReqRes response = userService.deactivateGeneralUser(userName);
             if (response.getStatusCode() == 200) {
                 String details = String.format("Deactivated User: %s, Deactivated By: %s", userName, currentUserUsername);
                 auditTrailService.logAuditTrailWithUsername("User Deactivate", "SUCCESS", details, currentUserRid);
@@ -309,6 +309,42 @@ public class UserController {
             logger.info("Action performed in " + duration + "ms");
         }
     }
+    
+    @PutMapping("/deactivate/{userName}")
+    public ResponseEntity<ReqRes> deactivateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
+        Integer adminUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current admin ID from context/session
+        long startTime = System.currentTimeMillis();
+        try {
+            // Fetch the username of the admin performing the action
+            String adminUsername = userDao.findUserNameByUserRid(adminUserRid);
+
+            // Determine if the user is a manager
+            boolean isManager = userService.isManager(userName);
+            
+            ReqRes response;
+            if (isManager) {
+                response = userService.deactivateManager(userName, adminUserRid);
+            } else {
+                response = userService.deactivateUser(userName);
+            }
+            
+            if (response.getStatusCode() == 200) {
+                String details = String.format("Deactivated User: %s, Deactivated By: %s", userName, adminUsername);
+                auditTrailService.logAuditTrailWithUsername("User Deactivate", "SUCCESS", details, adminUserRid);
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deactivating the user"));
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Action performed in " + duration + "ms");
+        }
+    }
+
 
     
     @PostMapping("/change-password")

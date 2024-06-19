@@ -612,7 +612,7 @@ public class UserService {
 		}
 	}
 
-	public ReqRes deactivateUser(String userName) {
+	public ReqRes deactivateGeneralUser(String userName) {
 		Optional<User> optionalUser = userDao.findByUserName(userName);
 		if (!optionalUser.isPresent()) {
 			return new ReqRes(404, "Not Found", "User not found");
@@ -698,6 +698,16 @@ public class UserService {
 		return users.stream().map(this::mapToUserDTO).collect(Collectors.toList());
 	}
 
+	public boolean isManager(String userName) {
+    Optional<User> optionalUser = userDao.findByUserName(userName);
+    if (!optionalUser.isPresent()) {
+        return false;
+    }
+
+    User user = optionalUser.get();
+    return user.getUserRoles().stream()
+               .anyMatch(role -> role.getRole().getRoleName().equalsIgnoreCase("manager"));
+}
 	public ReqRes deactivateManager(String userName, int adminUserRid) {
 	    Optional<User> optionalUser = userDao.findByUserName(userName);
 	    if (!optionalUser.isPresent()) {
@@ -706,14 +716,6 @@ public class UserService {
 
 	    User manager = optionalUser.get();
 	    
-	    // Check if the user is a manager
-	    boolean isManager = manager.getUserRoles().stream()
-	                            .anyMatch(role -> role.getRole().getRoleName().equalsIgnoreCase("manager"));
-	    
-	    if (!isManager) {
-	        return new ReqRes(400, "Bad Request", "User is not a manager");
-	    }
-
 	    // Determine the new manager for the reporting users
 	    User newManager = (manager.getManager() != null) ? manager.getManager() : userDao.findById(adminUserRid).orElse(null);
 
@@ -731,6 +733,18 @@ public class UserService {
 	    userDao.save(manager);
 	    
 	    return new ReqRes(200, null, "Manager deactivated successfully");
+	}
+
+	public ReqRes deactivateUser(String userName) {
+	    Optional<User> optionalUser = userDao.findByUserName(userName);
+	    if (!optionalUser.isPresent()) {
+	        return new ReqRes(404, "Not Found", "User not found");
+	    }
+
+	    User user = optionalUser.get();
+	    user.setActiveUser(false);
+	    userDao.save(user);
+	    return new ReqRes(200, null, "User deactivated successfully");
 	}
 
 
