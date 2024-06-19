@@ -699,35 +699,39 @@ public class UserService {
 	}
 
 	public ReqRes deactivateManager(String userName, int adminUserRid) {
-		Optional<User> optionalUser = userDao.findByUserName(userName);
-		if (!optionalUser.isPresent()) {
-			return new ReqRes(404, "Not Found", "Manager not found");
-		}
+	    Optional<User> optionalUser = userDao.findByUserName(userName);
+	    if (!optionalUser.isPresent()) {
+	        return new ReqRes(404, "Not Found", "Manager not found");
+	    }
 
-		User manager = optionalUser.get();
+	    User manager = optionalUser.get();
+	    
+	    // Check if the user is a manager
+	    boolean isManager = manager.getUserRoles().stream()
+	                            .anyMatch(role -> role.getRole().getRoleName().equalsIgnoreCase("manager"));
+	    
+	    if (!isManager) {
+	        return new ReqRes(400, "Bad Request", "User is not a manager");
+	    }
 
-		// Check if the user is a manager
-		boolean isManager = manager.getUserRoles().stream()
-				.anyMatch(role -> role.getRole().getRoleName().equalsIgnoreCase("manager"));
+	    // Determine the new manager for the reporting users
+	    User newManager = (manager.getManager() != null) ? manager.getManager() : userDao.findById(adminUserRid).orElse(null);
 
-		if (!isManager) {
-			return new ReqRes(400, "Bad Request", "User is not a manager");
-		}
+	    // Find users reporting to this manager
+	    List<User> reportingUsers = userDao.findByManagerUserRidAndIsNewUserFalse(manager.getUserRid());
+	    
+	    // Reassign these users to report to the new manager
+	    for (User reportingUser : reportingUsers) {
+	        reportingUser.setManager(newManager);
+	        userDao.save(reportingUser);
+	    }
 
-		// Find users reporting to this manager
-		List<User> reportingUsers = userDao.findByManagerUserRidAndIsNewUserFalse(manager.getUserRid());
-
-		// Reassign these users to report to the admin
-		for (User reportingUser : reportingUsers) {
-			reportingUser.setManager(userDao.findById(adminUserRid).orElse(null));
-			userDao.save(reportingUser);
-		}
-
-		// Deactivate the manager
-		manager.setActiveUser(false);
-		userDao.save(manager);
-
-		return new ReqRes(200, null, "Manager deactivated successfully");
+	    // Deactivate the manager
+	    manager.setActiveUser(false);
+	    userDao.save(manager);
+	    
+	    return new ReqRes(200, null, "Manager deactivated successfully");
 	}
+
 
 }
