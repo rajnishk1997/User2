@@ -419,10 +419,11 @@ public class UserController {
     }
     
     @GetMapping("/users/reports/{managerId}")
-    public ResponseEntity<List<UserDTO>> getUsersReportingToManager(@PathVariable int managerId) {
+    public ResponseEntity<List<UserDTO>> getUsersReportingToManager(@PathVariable int managerId,
+                                                                    @RequestParam(required = false) Boolean isActive) {
         long startTime = System.currentTimeMillis();
         try {
-            List<UserDTO> users = userService.getUsersReportingToManager(managerId);
+            List<UserDTO> users = userService.getUsersReportingToManager(managerId, isActive);
             return ResponseEntity.ok(users);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
@@ -433,6 +434,7 @@ public class UserController {
             logger.info("Action performed in " + duration + "ms");
         }
     }
+
 
     @PutMapping("/deactivateManager/{userName}")
     public ResponseEntity<ReqRes> deactivateManager(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {

@@ -766,5 +766,14 @@ public class UserService {
 	    return new ReqRes(200, null, "User deactivated successfully");
 	}
 
+	public List<UserDTO> getUsersReportingToManager(int managerId, Boolean isActive) {
+	    List<User> users;
+	    if (isActive == null) {
+	        users = userDao.findByManagerUserRid(managerId);
+	    } else {
+	        users = userDao.findByManagerUserRidAndIsActive(managerId, isActive);
+	    }
+	    return users.stream().map(this::mapToUserDTO).collect(Collectors.toList());
+	}
 
 }
