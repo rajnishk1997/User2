@@ -65,4 +65,22 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 
 	 @Query("SELECT u FROM User u WHERE u.manager.userRid = :managerId AND u.isNewUser = false")
     List<User> findByManagerUserRidAndIsNewUserFalse(@Param("managerId") int managerId);
+	 
+	 @Query("SELECT new com.optum.dto.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser) "
+		       + "FROM com.optum.entity.User u WHERE u.isActiveUser = :isActive")
+		List<UserInfo> searchUsersByStatus(@Param("isActive") Boolean isActive);
+
+		@Query("SELECT new com.optum.dto.UserInfo(u.userRid, u.userName, u.userFirstName, u.userLastName, u.userEmail, u.isActiveUser) "
+		       + "FROM com.optum.entity.User u WHERE "
+		       + "(LOWER(u.userFirstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
+		       + "LOWER(u.userLastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
+		       + "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
+		       + "AND (:isActive IS NULL OR u.isActiveUser = :isActive)")
+		List<UserInfo> searchUsersByKeywordAndStatus(@Param("keyword") String keyword, @Param("isActive") Boolean isActive);
+
+		 @Query("SELECT u FROM User u WHERE u.manager.userRid = :managerId")
+    List<User> findByManagerUserRid(@Param("managerId") int managerId);
+
+    @Query("SELECT u FROM User u WHERE u.manager.userRid = :managerId AND u.isActiveUser = :isActive")
+    List<User> findByManagerUserRidAndIsActive(@Param("managerId") int managerId, @Param("isActive") Boolean isActive);
 }

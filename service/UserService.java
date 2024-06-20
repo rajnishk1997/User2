@@ -483,14 +483,23 @@ public class UserService {
 		}
 	}
 
-	public List<UserInfo> searchUsersByKeyword(String keyword) {
-		try {
-			return userDao.searchUsersByKeywordWithoutRoles(keyword);
-		} catch (Exception e) {
-			// Log the exception or handle it as needed
-			return Collections.emptyList(); // Return an empty list in case of an error
-		}
+	public List<UserInfo> searchUsersByKeywordAndStatus(String keyword, Boolean isActive) {
+	    try {
+	        if (keyword == null && isActive == null) {
+	            return Collections.emptyList(); // Return empty list or handle as needed
+	        } else if (keyword == null) {
+	            return userDao.searchUsersByStatus(isActive);
+	        } else if (isActive == null) {
+	            return userDao.searchUsersByKeywordWithoutRoles(keyword);
+	        } else {
+	            return userDao.searchUsersByKeywordAndStatus(keyword, isActive);
+	        }
+	    } catch (Exception e) {
+	        // Log the exception or handle it as needed
+	        return Collections.emptyList(); // Return an empty list in case of an error
+	    }
 	}
+
 
 	public List<User> findByUserName(String userName) {
 		Optional<User> userOptional = userDao.findByUserName(userName);
@@ -703,10 +712,10 @@ public class UserService {
 		return new ReqRes(200, null, "User activated successfully");
 	}
 
-	public List<UserDTO> getUsersReportingToManager(int managerId) {
-		List<User> users = userDao.findByManagerUserRidAndIsNewUserFalse(managerId);
-		return users.stream().map(this::mapToUserDTO).collect(Collectors.toList());
-	}
+//	public List<UserDTO> getUsersReportingToManager(int managerId) {
+//		List<User> users = userDao.findByManagerUserRidAndIsNewUserFalse(managerId);
+//		return users.stream().map(this::mapToUserDTO).collect(Collectors.toList());
+//	}
 
 	public boolean isManager(String userName) {
     Optional<User> optionalUser = userDao.findByUserName(userName);

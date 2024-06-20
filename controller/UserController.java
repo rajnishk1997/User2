@@ -114,14 +114,10 @@ public class UserController {
 	// Method to match useCases:
 	
 	@GetMapping("/search")
-	public ResponseEntity<ResponseWrapper<List<UserInfo>>> getAllUsersCases(@RequestParam(required = true) String keyword) {
+	public ResponseEntity<ResponseWrapper<List<UserInfo>>> getAllUsersCases(@RequestParam(required = false) String keyword,
+	                                                                        @RequestParam(required = false) Boolean isActive) {
 	    try {
-	        List<UserInfo> userList;
-	        if (keyword.isEmpty()) {
-	            userList = userService.getAllUsers();
-	        } else {
-	            userList = userService.searchUsersByKeyword(keyword);
-	        }
+	        List<UserInfo> userList = userService.searchUsersByKeywordAndStatus(keyword, isActive);
 	        ReqRes reqRes;
 	        if (userList.isEmpty()) {
 	            reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
@@ -134,6 +130,7 @@ public class UserController {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));
 	    }
 	}
+
 
 
 	
