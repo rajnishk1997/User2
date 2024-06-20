@@ -46,9 +46,8 @@ public interface UserDao extends JpaRepository<User, Integer>, CustomUserReposit
 			+ "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))")
 	List<UserInfo> searchUsersByKeywordWithoutRoles(@Param("keyword") String keyword);
 
-	@Query("SELECT new com.optum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.userEmail, u.userRid) "
-			+ "FROM User u JOIN u.userRoles ur JOIN ur.role r WHERE u.userName = :username")
-	UserDTO findUserDetailsWithRolesByUsername(@Param("username") String username);
+	 @Query("SELECT u FROM User u LEFT JOIN FETCH u.userRoles WHERE u.userName = :username")
+	    User findUserDetailsWithRolesByUsername(@Param("username") String username);
 
 	  @Query("SELECT u FROM User u LEFT JOIN FETCH u.userRoles ur LEFT JOIN FETCH ur.role r LEFT JOIN FETCH r.rolePermissions rp LEFT JOIN FETCH rp.permission WHERE u.userName = :userName")
 	    Optional<User> findByUserNameWithRolesAndPermissions(@Param("userName") String userName);

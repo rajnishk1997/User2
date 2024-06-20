@@ -268,21 +268,21 @@ public class UserController {
 	    }
 
 
-    @GetMapping("/get-user-details/{username}")
-    public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
-        try {
-            UserDTO user = userService.getUserByUsername(username);
-            if (user != null) {
-                ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), null, "User retrieved successfully");
-                return ResponseEntity.ok(new ResponseWrapper<>(user, reqRes));
-            } else {
-                ReqRes reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "User with the given username not found");
-                return ResponseEntity.ok(new ResponseWrapper<>(null, reqRes));
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
-    }
+	 @GetMapping("/get-user-details/{username}")
+	 public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
+	     try {
+	         UserDTO user = userService.getUserByUsername(username);
+	         if (user != null) {
+	             ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), null, "User retrieved successfully");
+	             return ResponseEntity.ok(new ResponseWrapper<>(user, reqRes));
+	         } else {
+	             ReqRes reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "User not found", "User with the given username not found");
+	             return ResponseEntity.ok(new ResponseWrapper<>(null, reqRes));
+	         }
+	     } catch (Exception e) {
+	         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+	     }
+	 }
     
     @PutMapping("/deactivate-general-user/{userName}")
     public ResponseEntity<ReqRes> deactivateGeneralUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {

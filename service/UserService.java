@@ -517,32 +517,42 @@ public class UserService {
 	}
 
 	public UserDTO getUserByUsername(String username) {
-		try {
-			return userDao.findUserDetailsWithRolesByUsername(username);
-		} catch (Exception e) {
-			// Log the exception or handle it as needed
-			return null; // Return null in case of an error
-		}
+	    try {
+	        User user = userDao.findUserDetailsWithRolesByUsername(username);
+	        if (user != null) {
+	            Integer managerId = (user.getManager() != null) ? user.getManager().getUserRid() : null;
+	            return mapToUserDTO(user);
+	        } else {
+	            return null; // Return null if user not found
+	        }
+	    } catch (Exception e) {
+	        // Log the exception or handle it as needed
+	        return null; // Return null in case of an error
+	    }
 	}
 
-	public UserDTO mapToUserDTO(User user) {
-		UserDTO userDTO = new UserDTO();
-		userDTO.setUserFirstName(user.getUserFirstName());
-		userDTO.setUserName(user.getUserName());
-		userDTO.setUserRid(user.getUserRid());
-		userDTO.setUserLastName(user.getUserLastName());
-		userDTO.setUserEmail(user.getUserEmail());
-		userDTO.setRoles(user.getRoles().stream().map(this::mapToRoleDTO).collect(Collectors.toList()));
-		return userDTO;
-	}
+	 private UserDTO mapToUserDTO(User user) {
+	        Integer managerId = (user.getManager() != null) ? user.getManager().getUserRid() : null;
+	        UserDTO userDTO = new UserDTO(
+	            user.getUserName(),
+	            user.getUserFirstName(),
+	            user.getUserLastName(),
+	            user.getUserPassword(),
+	            user.getUserEmail(),
+	            user.getUserRid(),
+	            managerId
+	        );
+	        userDTO.setRoles(user.getUserRoles().stream().map(userRole -> mapToRoleDTO(userRole.getRole())).collect(Collectors.toList()));
+	        return userDTO;
+	    }
 
-	public RoleDTO mapToRoleDTO(Role role) {
-		RoleDTO roleDTO = new RoleDTO();
-		roleDTO.setRoleRid(role.getRoleRid());
-		roleDTO.setRoleName(role.getRoleName());
-		roleDTO.setPermissions(fetchPermissionsForRole(role));
-		return roleDTO;
-	}
+	 public RoleDTO mapToRoleDTO(Role role) {
+	        RoleDTO roleDTO = new RoleDTO();
+	        roleDTO.setRoleRid(role.getRoleRid());
+	        roleDTO.setRoleName(role.getRoleName());
+	        roleDTO.setPermissions(fetchPermissionsForRole(role));
+	        return roleDTO;
+	    }
 
 	public List<PermissionDTO> fetchPermissionsForRole(Role role) {
 		List<PermissionDTO> permissionDTOs = new ArrayList<>();
