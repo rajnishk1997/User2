@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.optum.controller.UserController;
 import com.optum.service.AuditTrailService;
+import com.optum.util.JwtUtil;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
@@ -27,13 +28,16 @@ public class CustomLogoutSuccessHandler implements LogoutSuccessHandler {
 	
 	private static final Logger logger = LogManager.getLogger(CustomLogoutSuccessHandler.class);
 
-    private final AuditTrailService auditTrailService;
+
+    private final JwtUtil jwtTokenUtil; // Assuming you have a JwtTokenUtil for JWT operations
     private final ObjectMapper objectMapper;
+    private final AuditTrailService auditTrailService;
 
     @Autowired
-    public CustomLogoutSuccessHandler(AuditTrailService auditTrailService, ObjectMapper objectMapper) {
-        this.auditTrailService = auditTrailService;
+    public CustomLogoutSuccessHandler(JwtUtil jwtTokenUtil, ObjectMapper objectMapper, AuditTrailService auditTrailService) {
+        this.jwtTokenUtil = jwtTokenUtil;
         this.objectMapper = objectMapper;
+        this.auditTrailService = auditTrailService;
     }
 
     @Override
@@ -49,9 +53,11 @@ public class CustomLogoutSuccessHandler implements LogoutSuccessHandler {
             JsonNode jsonNode = objectMapper.readTree(requestBody);
             currentUserId = jsonNode.get("currentUserId").asInt();
 
-            // Perform logout
-            if (authentication != null) {
-                new SecurityContextLogoutHandler().logout(request, response, authentication);
+            // Optionally, invalidate JWT token
+            String token = request.getHeader("Authorization");
+            if (token != null && token.startsWith("Bearer ")) {
+                String jwtToken = token.substring(7);
+                jwtTokenUtil.invalidateToken(jwtToken); // Implement this method to invalidate token
             }
 
             // Log the logout action
@@ -61,8 +67,8 @@ public class CustomLogoutSuccessHandler implements LogoutSuccessHandler {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         } finally {
         	 long endTime = System.currentTimeMillis();
- 	        long duration = endTime - startTime;
- 	        logger.info("Logout Action performed in " + duration + "ms");
+  	        long duration = endTime - startTime;
+  	        logger.info("Logout Action performed in " + duration + "ms");
         }
     }
 }
