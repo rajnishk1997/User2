@@ -88,16 +88,19 @@ public class JwtController {
 	public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication, @RequestBody Integer currentUserId) {
 	    long startTime = System.currentTimeMillis();
 	    try {
+	        logger.debug("Logout request received for user ID: {}", currentUserId);
 	        if (authentication != null) {
+	            logger.debug("Authentication object is not null, proceeding with logout");
 	            new SecurityContextLogoutHandler().logout(request, response, authentication);
+	        } else {
+	            logger.warn("Authentication object is null, cannot perform logout");
 	        }
 	        // Log the logout action
 	        auditTrailService.logAuditTrailWithUsername("logout", "SUCCESS", "Logged out successfully", currentUserId);
-	        // Optionally, you can log successful logout
 	        logger.info("User with ID {} logged out successfully", currentUserId);
 	        return ResponseEntity.ok("Logged out successfully");
 	    } catch (Exception e) {
-	        logger.error("Logout failed", e);
+	        logger.error("Logout failed for user with ID {}: {}", currentUserId, e.getMessage(), e);
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to logout");
 	    } finally {
 	        long endTime = System.currentTimeMillis();
@@ -105,4 +108,5 @@ public class JwtController {
 	        logger.info("Log Out Action performed in {}ms", duration);
 	    }
 	}
+
 }
