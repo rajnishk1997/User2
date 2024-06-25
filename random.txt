@@ -1,36 +1,17 @@
-  @Query("SELECT new com.opyum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.email, r.roleName, u.userRid, u.manager.userRid) " +
+ @Query("SELECT new com.opyum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.email, " +
+           "(SELECT r FROM Role r JOIN ur.role r WHERE ur.user = u), u.userRid, u.manager.userRid) " +
            "FROM User u " +
-           "JOIN u.roles r " +
+           "JOIN u.userRoles ur " +
            "WHERE u.isNewUser = true AND u.manager.userRid = :managerId")
     List<UserDTO> findNewUsersByManagerId(@Param("managerId") int managerId);
 	
-	public List<UserDTO> getNewUsers(int managerId) {
-        try {
-            return userDao.findNewUsersByManagerId(managerId);
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
-    }
-	
-	 @GetMapping("/newuser")
-    public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers(@RequestParam int managerId) {
-        try {
-            List<UserDTO> newUsers = userService.getNewUsers(managerId);
-            ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<>(newUsers, new ReqRes(200, null, "Users retrieved successfully"));
-            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-        } catch (Exception e) {
-            ResponseWrapper<List<UserDTO>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
-            return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-	
-	 public UserDTO(String userName, String userFirstName, String userLastName, String userPassword, String userEmail, List<RoleDTO> roleName, int userRid, Integer managerId) {
+	 public UserDTO(String userName, String userFirstName, String userLastName, String userPassword, String userEmail, List<RoleDTO> roles, int userRid, Integer managerId) {
         this.userName = userName;
         this.userFirstName = userFirstName;
         this.userLastName = userLastName;
         this.userPassword = userPassword;
         this.userEmail = userEmail;
-        this.roleName = roleName;
+        this.roles = roles;
         this.userRid = userRid;
         this.managerId = managerId;
     }
