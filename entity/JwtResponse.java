@@ -1,8 +1,12 @@
 package com.optum.entity;
 
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.optum.dto.response.PermissionInfo;
 import com.optum.dto.response.RoleInfo;
 
 public class JwtResponse {
@@ -54,24 +58,36 @@ public class JwtResponse {
 //		this.firstLogin = user.isFirstLogin();
 //
 //	}
-	public JwtResponse(int statusCode, String message, String error, String jwtToken, Set<RoleInfo> roleInfos, User user) {
-	    this.statusCode = statusCode;
-	    this.message = message != null ? message : "";
-	    this.error = error != null ? error : "";
-	    this.jwtToken = jwtToken != null ? jwtToken : "";
-	    this.roles = roleInfos != null ? roleInfos : new HashSet<>();
-	    
-	    if (user != null) {
-	        this.userName = user.getUserName() != null ? user.getUserName() : "";
-	        this.userEmail = user.getUserEmail() != null ? user.getUserEmail() : "";
-	        this.firstLogin = user.isFirstLogin();
-	        this.currentUserId = user.getCurrentUserId()!= null ? user.getCurrentUserId() : 0;
-	    } else {
-	        this.userName = "";
-	        this.userEmail = "";
-	    }
-	}
+	  public JwtResponse(int statusCode, String message, String error, String jwtToken, Set<RoleInfo> roleInfos, User user) {
+	        this.statusCode = statusCode;
+	        this.message = message != null ? message : "";
+	        this.error = error != null ? error : "";
+	        this.jwtToken = jwtToken != null ? jwtToken : "";
+	        
+	        // Ensure roles and permissions are sorted
+	        if (roleInfos != null) {
+	            this.roles = roleInfos.stream().map(role -> {
+	                if (role.getPermissions() != null) {
+	                    role.setPermissions(role.getPermissions().stream()
+	                            .sorted(Comparator.comparing(PermissionInfo::getPermissionRid))
+	                            .collect(Collectors.toCollection(LinkedHashSet::new)));
+	                }
+	                return role;
+	            }).collect(Collectors.toCollection(LinkedHashSet::new));
+	        } else {
+	            this.roles = new HashSet<>();
+	        }
 
+	        if (user != null) {
+	            this.userName = user.getUserName() != null ? user.getUserName() : "";
+	            this.userEmail = user.getUserEmail() != null ? user.getUserEmail() : "";
+	            this.firstLogin = user.isFirstLogin();
+	            this.currentUserId = user.getCurrentUserId() != null ? user.getCurrentUserId() : 0;
+	        } else {
+	            this.userName = "";
+	            this.userEmail = "";
+	        }
+	    }
 	public boolean isFirstLogin() {
 		return firstLogin;
 	}
@@ -131,4 +147,21 @@ public class JwtResponse {
 	public void setJwtToken(String jwtToken) {
 		this.jwtToken = jwtToken;
 	}
+	
+	 public Set<RoleInfo> getRoles() {
+	        if (roles != null) {
+	            roles.forEach(role -> {
+	                if (role.getPermissions() != null) {
+	                    role.setPermissions(role.getPermissions().stream()
+	                            .sorted(Comparator.comparing(PermissionInfo::getPermissionRid))
+	                            .collect(Collectors.toCollection(LinkedHashSet::new)));
+	                }
+	            });
+	        }
+	        return roles;
+	    }
+
+	    public void setRoles(Set<RoleInfo> roles) {
+	        this.roles = roles;
+	    }
 }
