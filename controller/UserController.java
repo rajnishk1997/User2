@@ -41,7 +41,7 @@ import java.util.concurrent.CompletableFuture;
 import javax.annotation.PostConstruct;
 import javax.management.relation.RoleNotFoundException;
 @RestController
-public class UserController {
+public class UserController implements UserControllerInterface {
 	
 	private static final Logger logger = LogManager.getLogger(UserController.class);
 
@@ -57,6 +57,7 @@ public class UserController {
     private AuditTrailService auditTrailService;
 
 
+	@Override
 	@PostConstruct // PostConstruct as I wish to run this code once the compilation is done.
 	public void initRoleAndUser() {
 	    try {
@@ -70,6 +71,7 @@ public class UserController {
 	}
 
 
+	@Override
 	@PostMapping("/registerNewUser")
 	public ResponseEntity<RegistrationResponse<User>> registerNewUser(@RequestBody UserRequestDTO userRequestDTO) {
 	    int currentUserRid = userRequestDTO.getCurrentUserId(); 
@@ -113,6 +115,7 @@ public class UserController {
 
 	// Method to match useCases:
 	
+	@Override
 	@GetMapping("/search")
 	public ResponseEntity<ResponseWrapper<List<UserInfo>>> getAllUsersCases(@RequestParam(required = false) String keyword,
 	                                                                        @RequestParam(required = false) Boolean isActive) {
@@ -135,6 +138,7 @@ public class UserController {
 
 	
 	
+	@Override
 	@PutMapping("/update/{userName}")
 	public ResponseEntity<ReqRes> updateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
 	    int currentUserRid = userRequestDTO.getCurrentUserId();
@@ -180,7 +184,8 @@ public class UserController {
 
 
 	
-	 @DeleteMapping("/delete/{userName}")
+	 @Override
+	@DeleteMapping("/delete/{userName}")
 	    public ResponseEntity<ReqRes> deleteUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
 	        int currentUserRid = userRequestDTO.getCurrentUserId(); 
 	        long startTime = System.currentTimeMillis();
@@ -207,7 +212,8 @@ public class UserController {
 	    }
 
 	  
-	 @GetMapping("/newuser")
+	 @Override
+	@GetMapping("/newuser")
 	 public ResponseEntity<ResponseWrapper<List<UserInfo>>> getNewUsers(@RequestParam int managerId) {
 	     try {
 	         List<UserInfo> newUsers = userService.getNewUsers(managerId);
@@ -221,7 +227,8 @@ public class UserController {
 
 
 
-	 @PostMapping("/accept/{userName}")
+	 @Override
+	@PostMapping("/accept/{userName}")
 	    public ResponseEntity<ResponseWrapper<ChangePasswordRequest>> acceptNewUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
 	        Integer currentUserRid = userRequestDTO.getCurrentUserId();
 	        long startTime = System.currentTimeMillis();
@@ -265,7 +272,8 @@ public class UserController {
 	    }
 
 
-	 @GetMapping("/get-user-details/{username}")
+	 @Override
+	@GetMapping("/get-user-details/{username}")
 	 public ResponseEntity<ResponseWrapper<UserDTO>> getUserByUsername(@PathVariable String username) {
 	     try {
 	         UserDTO user = userService.getUserByUsername(username);
@@ -281,7 +289,8 @@ public class UserController {
 	     }
 	 }
     
-    @PutMapping("/deactivate-general-user/{userName}")
+    @Override
+	@PutMapping("/deactivate-general-user/{userName}")
     public ResponseEntity<ReqRes> deactivateGeneralUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
         Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
         long startTime = System.currentTimeMillis();
@@ -307,7 +316,8 @@ public class UserController {
         }
     }
     
-    @PutMapping("/deactivate/{userName}")
+    @Override
+	@PutMapping("/deactivate/{userName}")
     public ResponseEntity<ReqRes> deactivateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
         Integer adminUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current admin ID from context/session
         long startTime = System.currentTimeMillis();
@@ -344,7 +354,8 @@ public class UserController {
 
 
     
-    @PostMapping("/change-password")
+    @Override
+	@PostMapping("/change-password")
     public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request) {
         Integer currentUserRid = request.getCurrentUserId();
         long startTime = System.currentTimeMillis();
@@ -362,7 +373,8 @@ public class UserController {
         }
     }
     
-    @PostMapping("/firstloginpassword")
+    @Override
+	@PostMapping("/firstloginpassword")
     public ResponseEntity<String> firstLoginChangePassword(@RequestBody ChangePasswordRequest request) {
         Integer currentUserRid = request.getCurrentUserId();
         long startTime = System.currentTimeMillis();
@@ -380,7 +392,8 @@ public class UserController {
         }
     }
     
-    @GetMapping("/managers")
+    @Override
+	@GetMapping("/managers")
     public ResponseEntity<ResponseWrapper<List<UserInfo>>> getManagers() {
         try {
             List<UserInfo> userInfos = userService.getManagers();
@@ -392,7 +405,8 @@ public class UserController {
         }
     }
     
-    @PutMapping("/activate/{userName}")
+    @Override
+	@PutMapping("/activate/{userName}")
     public ResponseEntity<ReqRes> activateUser(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
         Integer currentUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current user ID from context/session
         long startTime = System.currentTimeMillis();
@@ -418,7 +432,8 @@ public class UserController {
         }
     }
     
-    @GetMapping("/users/reports/{managerId}")
+    @Override
+	@GetMapping("/users/reports/{managerId}")
     public ResponseEntity<List<UserDTO>> getUsersReportingToManager(@PathVariable int managerId,
                                                                     @RequestParam(required = false) Boolean isActive) {
         long startTime = System.currentTimeMillis();
@@ -436,7 +451,8 @@ public class UserController {
     }
 
 
-    @PutMapping("/deactivateManager/{userName}")
+    @Override
+	@PutMapping("/deactivateManager/{userName}")
     public ResponseEntity<ReqRes> deactivateManager(@PathVariable String userName, @RequestBody UserRequestDTO userRequestDTO) {
         Integer adminUserRid = userRequestDTO.getCurrentUserId(); // Retrieve the current admin ID from context/session
         long startTime = System.currentTimeMillis();
@@ -465,12 +481,14 @@ public class UserController {
 
 
 
+	@Override
 	@GetMapping({ "/forAdmin" })
 	@PreAuthorize("hasRole('Admin')")
 	public String forAdmin() {
 		return "This URL is only accessible to the admin";
 	}
 
+	@Override
 	@GetMapping({ "/forUser" })
 	@PreAuthorize("hasRole('User')")
 	public String forUser() {

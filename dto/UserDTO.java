@@ -10,16 +10,27 @@ public class UserDTO {
     private String userEmail;
     private List<RoleDTO> roleName;
     private int userRid;
+    private Integer managerId;
     
  // Constructor
-    public UserDTO(String userName, String userFirstName, String userLastName, String userPassword, String userEmail, int userRid) {
+    public UserDTO(String userName, String userFirstName, String userLastName, String userPassword, String userEmail, int userRid,Integer managerId) {
         this.userName = userName;
         this.userFirstName = userFirstName;
         this.userLastName = userLastName;
         this.userPassword = userPassword;
         this.userEmail = userEmail;
         this.userRid = userRid;
+        this.managerId = managerId;
     }
+    
+	public Integer getManagerId() {
+		return managerId;
+	}
+
+	public void setManagerId(Integer managerId) {
+		this.managerId = managerId;
+	}
+
 	public UserDTO() {
 		// TODO Auto-generated constructor stub
 	}

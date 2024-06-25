@@ -27,9 +27,9 @@ public class RoleInfo {
 		this.permissions = permissions;
 	}
 
-	 public RoleInfo(int roleRid, String roleName) {
+	public RoleInfo(int roleRid, String roleName) {
 	        this.roleRid = roleRid;
 	        this.roleName = roleName;
 	        this.permissions = new HashSet<>();
-	    }
+	}
 }
