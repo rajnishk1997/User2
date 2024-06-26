@@ -45,17 +45,20 @@ public class JwtController {
 	    try {
 	        String loginIdentifier = jwtRequest.getUserName();
 
-	        JwtResponse customJwtResponse;
+	        // Check if the provided input is an email
 	        if (isValidEmail(loginIdentifier)) {
-	            customJwtResponse = jwtService.createJwtTokenByEmail(loginIdentifier, jwtRequest.getUserPassword());
+	            // If it's an email, directly call the service layer with the email
+	            JwtResponse customJwtResponse = jwtService.createJwtTokenByEmail(loginIdentifier, jwtRequest.getUserPassword());
+	            currentUserRid = customJwtResponse.getCurrentUserId();
+	            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for email: " + loginIdentifier, currentUserRid);
+	            return ResponseEntity.ok(customJwtResponse);
 	        } else {
-	            customJwtResponse = jwtService.createJwtTokenByUsername(loginIdentifier, jwtRequest.getUserPassword());
+	            // If it's not an email, assume it's a username and call the service layer with the username
+	            JwtResponse customJwtResponse = jwtService.createJwtTokenByUsername(loginIdentifier, jwtRequest.getUserPassword());
+	            currentUserRid = customJwtResponse.getCurrentUserId();
+	            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + loginIdentifier, currentUserRid);
+	            return ResponseEntity.ok(customJwtResponse);
 	        }
-
-	        currentUserRid = customJwtResponse.getCurrentUserId();
-	        auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for " + (isValidEmail(loginIdentifier) ? "email: " : "username: ") + loginIdentifier, currentUserRid);
-	        return ResponseEntity.ok(customJwtResponse);
-
 	    } catch (BadCredentialsException e) {
 	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 	                .body(new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null));
@@ -72,7 +75,6 @@ public class JwtController {
 	        logger.info("Login Action performed in " + duration + "ms");
 	    }
 	}
-
 
 	// Validate email address format
 	private boolean isValidEmail(String email) {
