@@ -1,23 +1,59 @@
-  @Query("SELECT u FROM User u WHERE u.isNewUser = true AND u.manager.userRid = :managerId")
-    List<User> findNewUsersByManagerId(@Param("managerId") int managerId);
+ @Query("SELECT new com.optum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.userEmail, u.userRid, u.manager.userRid, " +
+           "(SELECT r FROM UserRole ur JOIN ur.role r WHERE ur.user = u)) " +
+           "FROM User u WHERE u.isActiveUser = :isActive")
+    List<UserDTO> searchUsersByStatus(@Param("isActive") Boolean isActive);
+
+    @Query("SELECT new com.optum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.userEmail, u.userRid, u.manager.userRid, " +
+           "(SELECT r FROM UserRole ur JOIN ur.role r WHERE ur.user = u)) " +
+           "FROM User u WHERE " +
+           "LOWER(u.userFirstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.userLastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<UserDTO> searchUsersByKeywordWithoutRoles(@Param("keyword") String keyword);
+
+    @Query("SELECT new com.optum.dto.UserDTO(u.userName, u.userFirstName, u.userLastName, u.userPassword, u.userEmail, u.userRid, u.manager.userRid, " +
+           "(SELECT r FROM UserRole ur JOIN ur.role r WHERE ur.user = u)) " +
+           "FROM User u WHERE " +
+           "(LOWER(u.userFirstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.userLastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+           "AND (:isActive IS NULL OR u.isActiveUser = :isActive)")
+    List<UserDTO> searchUsersByKeywordAndStatus(@Param("keyword") String keyword, @Param("isActive") Boolean isActive);
 	
-	 public List<UserDTO> getNewUsers(int managerId) {
+	
+	Service:
+	
+	 public List<UserDTO> searchUsersByKeywordAndStatus(String keyword, Boolean isActive) {
         try {
-            List<User> newUsers = userDao.findNewUsersByManagerId(managerId);
-            return newUsers.stream().map(this::mapToUserDTO).collect(Collectors.toList());
+            List<UserDTO> users;
+            if (keyword == null && isActive == null) {
+                users = Collections.emptyList();
+            } else if (keyword == null) {
+                users = userDao.searchUsersByStatus(isActive);
+            } else if (isActive == null) {
+                users = userDao.searchUsersByKeywordWithoutRoles(keyword);
+            } else {
+                users = userDao.searchUsersByKeywordAndStatus(keyword, isActive);
+            }
+            return users;
         } catch (Exception e) {
+            // Log the exception or handle it as needed
             return Collections.emptyList();
         }
     }
 	
-	 @GetMapping("/newuser")
-    public ResponseEntity<ResponseWrapper<List<UserDTO>>> getNewUsers(@RequestParam int managerId) {
-        try {
-            List<UserDTO> newUsers = userService.getNewUsers(managerId);
-            ResponseWrapper<List<UserDTO>> responseWrapper = new ResponseWrapper<>(newUsers, new ReqRes(200, null, "Users retrieved successfully"));
-            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
+	
+	Cont:
+	try {
+            List<UserDTO> userList = userService.searchUsersByKeywordAndStatus(keyword, isActive);
+            ReqRes reqRes;
+            if (userList.isEmpty()) {
+                reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Users not found", "No users found in the database");
+            } else {
+                reqRes = new ReqRes(HttpStatus.OK.value(), null, "Users retrieved successfully");
+            }
+            return ResponseEntity.ok(new ResponseWrapper<>(userList, reqRes));
         } catch (Exception e) {
-            ResponseWrapper<List<UserDTO>> errorResponseWrapper = new ResponseWrapper<>(null, new ReqRes(500, "Internal Server Error", "An error occurred while retrieving new users"));
-            return new ResponseEntity<>(errorResponseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
+            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while retrieving users");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseWrapper<>(null, reqRes));
         }
-    }
