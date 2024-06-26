@@ -1,47 +1,73 @@
- @Query("SELECT u FROM User u WHERE u.isActiveUser = :isActive")
-    List<User> searchUsersByStatus(@Param("isActive") Boolean isActive);
+@Service
+public class SotFieldDetailsService {
+    // Other service methods and dependencies
 
-    @Query("SELECT u FROM User u WHERE " +
-           "LOWER(u.userFirstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.userLastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    List<User> searchUsersByKeywordWithoutRoles(@Param("keyword") String keyword);
+    @Autowired
+    private AuditTrailService auditTrailService;
 
-    @Query("SELECT u FROM User u WHERE " +
-           "(LOWER(u.userFirstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.userLastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.userName) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-           "AND (:isActive IS NULL OR u.isActiveUser = :isActive)")
-    List<User> searchUsersByKeywordAndStatus(@Param("keyword") String keyword, @Param("isActive") Boolean isActive);
-	
-	 public List<UserDTO> searchUsersByKeywordAndStatus(String keyword, Boolean isActive) {
-        try {
-            List<User> users;
-            if (keyword == null && isActive == null) {
-                users = Collections.emptyList();
-            } else if (keyword == null) {
-                users = userDao.searchUsersByStatus(isActive);
-            } else if (isActive == null) {
-                users = userDao.searchUsersByKeywordWithoutRoles(keyword);
-            } else {
-                users = userDao.searchUsersByKeywordAndStatus(keyword, isActive);
-            }
-            return users.stream().map(this::mapToUserDTO).collect(Collectors.toList());
-        } catch (Exception e) {
-            // Log the exception or handle it as needed
-            return Collections.emptyList();
-        }
+    public SotFieldDetails updateSotFieldDetails(int id, SotFieldDetailsDto sotFieldDetailsDto, Integer currentUserRid) {
+        SotFieldDetails existingSotFieldDetails = getSotFieldDetailsById(id);
+
+        // Capture old values before updating
+        String oldSotFieldName = existingSotFieldDetails.getSotFieldName();
+        String oldSotFieldRename = existingSotFieldDetails.getSotFieldRename();
+        boolean oldSOTValidationRequired = existingSotFieldDetails.isSOTValidationRequired();
+
+        // Update the entity
+        existingSotFieldDetails.setSotFieldName(sotFieldDetailsDto.getSotFieldName());
+        existingSotFieldDetails.setSotFieldRename(sotFieldDetailsDto.getSotFieldRename());
+        existingSotFieldDetails.setSOTValidationRequired(sotFieldDetailsDto.isSOTValidationRequired());
+        existingSotFieldDetails.setModifiedBy(currentUserRid);
+        existingSotFieldDetails.setModifiedDate(new Date());
+
+        SotFieldDetails updatedSotFieldDetails = sotFieldDetailsRepository.save(existingSotFieldDetails);
+
+        // Log audit trail asynchronously
+        CompletableFuture.runAsync(() -> {
+            String oldDetails = String.format(
+                "Old SotFieldName: %s, Old SotFieldRename: %s, Old SOTValidationRequired: %s",
+                oldSotFieldName,
+                oldSotFieldRename,
+                oldSOTValidationRequired
+            );
+            String newDetails = String.format(
+                "New SotFieldName: %s, New SotFieldRename: %s, New SOTValidationRequired: %s",
+                updatedSotFieldDetails.getSotFieldName(),
+                updatedSotFieldDetails.getSotFieldRename(),
+                updatedSotFieldDetails.isSOTValidationRequired()
+            );
+            String details = oldDetails + "; " + newDetails;
+            auditTrailService.logAuditTrailWithUsername("SOT Field Updated", "SUCCESS", details, currentUserRid);
+        });
+
+        return updatedSotFieldDetails;
     }
-	
-	 // Constructor
-    public UserDTO(String userName, String userFirstName, String userLastName, String userPassword, String userEmail, int userRid, Integer managerId) {
-        this.userName = userName;
-        this.userFirstName = userFirstName;
-        this.userLastName = userLastName;
-        this.userPassword = userPassword;
-        this.userEmail = userEmail;
-        this.userRid = userRid;
-        this.managerId = managerId;
+}
+
+
+@PutMapping("updateSOT/{id}")
+public ResponseEntity<ResponseWrapper<SotFieldDetails>> updateSotFieldDetails(@PathVariable int id, @RequestBody SotFieldDetailsDto sotFieldDetailsDto) {
+    Integer currentUserRid = sotFieldDetailsDto.getCurrentUserId();
+    long startTime = System.currentTimeMillis();
+    try {
+        SotFieldDetails updatedSotFieldDetails = sotFieldDetailsService.updateSotFieldDetails(id, sotFieldDetailsDto, currentUserRid);
+
+        // Create and return the response
+        ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "SUCCESS", "SOT Field updated successfully");
+        ResponseWrapper<SotFieldDetails> response = new ResponseWrapper<>(updatedSotFieldDetails, reqRes);
+
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    } catch (IllegalArgumentException e) {
+        ReqRes reqRes = new ReqRes(HttpStatus.BAD_REQUEST.value(), "Bad Request", e.getMessage());
+        ResponseWrapper<SotFieldDetails> response = new ResponseWrapper<>(null, reqRes);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    } catch (Exception e) {
+        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while updating the SOT Field");
+        ResponseWrapper<SotFieldDetails> response = new ResponseWrapper<>(null, reqRes);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    } finally {
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        logger.info("Update SOT Field Details Action performed in " + duration + "ms");
     }
-	
-	
+}
