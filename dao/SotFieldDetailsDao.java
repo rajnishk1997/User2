@@ -17,4 +17,7 @@ public interface SotFieldDetailsDao extends JpaRepository<SotFieldDetails, Integ
 	           "OR LOWER(s.sotFieldRename) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
 	           "AND (:validation IS NULL OR s.isSOTValidationRequired = :validation)")
 	    List<SotFieldDetails> searchByKeywordAndValidation(@Param("keyword") String keyword, @Param("validation") Boolean validation);
+
+	  @Query("SELECT s FROM SotFieldDetails s WHERE s.sotFieldRename = :sotFieldRename")
+	    SotFieldDetails findBySotFieldRename(@Param("sotFieldRename") String sotFieldRename);
 }

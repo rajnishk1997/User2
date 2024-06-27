@@ -16,5 +16,8 @@ public interface GppFieldDetailsDao extends JpaRepository<GppFieldDetails, Integ
            + "LOWER(g.gppFieldRename) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
            + "AND (:validation IS NULL OR g.isGPPValidationRequired = :validation)")
     List<GppFieldDetails> searchByKeywordAndValidation(@Param("keyword") String keyword, @Param("validation") Boolean validation);
+
+    @Query("SELECT g FROM GppFieldDetails g WHERE g.gppFieldRename = :gppFieldRename")
+    GppFieldDetails findByGppFieldRename(@Param("gppFieldRename") String gppFieldRename);
 }
 

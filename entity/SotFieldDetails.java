@@ -27,6 +27,9 @@ public class SotFieldDetails {
 	    @Column(name = "rx_exact_match")
 	    private String exactMatch;
 	    
+	    @Column(name = "rx_remark")
+	    private String sotRemark;
+	    
 	    @Column(name = "rx_sot_validation_req")
 	    private boolean isSOTValidationRequired;
 	    
@@ -111,6 +114,14 @@ public class SotFieldDetails {
 
 		public void setExactMatch(String exactMatch) {
 			this.exactMatch = exactMatch;
+		}
+
+		public String getSotRemark() {
+			return sotRemark;
+		}
+
+		public void setSotRemark(String sotRemark) {
+			this.sotRemark = sotRemark;
 		}
 	    
 }
