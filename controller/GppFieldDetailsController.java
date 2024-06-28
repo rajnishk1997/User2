@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.optum.dao.ReqRes;
 import com.optum.dto.GppFieldDetailsDto;
+import com.optum.dto.GppRenameDto;
 import com.optum.entity.GppFieldDetails;
 import com.optum.entity.ResponseWrapper;
 import com.optum.service.GppFieldDetailsService;
@@ -150,4 +151,24 @@ public class GppFieldDetailsController {
             logger.info("Search GPP Field Details Action performed in " + duration + "ms");
         }
     }
+    
+    @GetMapping("/getGppRenames")
+    public ResponseEntity<ResponseWrapper<List<GppRenameDto>>> getAllGppRenames() {
+        long startTime = System.currentTimeMillis();
+        try {
+            List<GppRenameDto> gppRenames = gppFieldDetailsService.getAllGppRenames();
+            ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "SUCCESS", "Fetched all GPP renames successfully");
+            ResponseWrapper<List<GppRenameDto>> response = new ResponseWrapper<>(gppRenames, reqRes);
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+        } catch (Exception e) {
+            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while fetching GPP renames");
+            ResponseWrapper<List<GppRenameDto>> response = new ResponseWrapper<>(null, reqRes);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Fetched all GPP renames in " + duration + "ms");
+        }
+    }
+
 }

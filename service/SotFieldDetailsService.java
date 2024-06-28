@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.optum.dao.SotFieldDetailsDao;
 import com.optum.dto.SotFieldDetailsDto;
+import com.optum.dto.SotRenameDto;
 import com.optum.entity.SotFieldDetails;
 
 @Service
@@ -55,5 +56,9 @@ public class SotFieldDetailsService {
             return getAllSotFieldDetails();
         }
         return sotFieldDetailsRepository.searchByKeywordAndValidation(keyword, validation);
+    }
+    
+    public List<SotRenameDto> getAllSotRenames() {
+        return sotFieldDetailsRepository.findAllSotRenames();
     }
 }

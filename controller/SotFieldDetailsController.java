@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.optum.dao.ReqRes;
 import com.optum.dto.SotFieldDetailsDto;
+import com.optum.dto.SotRenameDto;
 import com.optum.entity.RegistrationResponse;
 import com.optum.entity.ResponseWrapper;
 import com.optum.entity.SotFieldDetails;
@@ -134,6 +135,25 @@ public class SotFieldDetailsController {
             @RequestParam(required = false) Boolean validate) {
         List<SotFieldDetails> sotFieldDetailsList = sotFieldDetailsService.searchSotFieldDetails(keyword, validate);
         return new ResponseEntity<>(sotFieldDetailsList, HttpStatus.OK);
+    }
+    
+    @GetMapping("/getSotRenames")
+    public ResponseEntity<ResponseWrapper<List<SotRenameDto>>> getAllSotRenames() {
+        long startTime = System.currentTimeMillis();
+        try {
+            List<SotRenameDto> sotRenames = sotFieldDetailsService.getAllSotRenames();
+            ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "SUCCESS", "Fetched all SOT renames successfully");
+            ResponseWrapper<List<SotRenameDto>> response = new ResponseWrapper<>(sotRenames, reqRes);
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+        } catch (Exception e) {
+            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while fetching SOT renames");
+            ResponseWrapper<List<SotRenameDto>> response = new ResponseWrapper<>(null, reqRes);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Fetched all SOT renames in " + duration + "ms");
+        }
     }
     
 }

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.optum.dao.GppFieldDetailsDao;
 import com.optum.dto.GppFieldDetailsDto;
+import com.optum.dto.GppRenameDto;
 import com.optum.entity.GppFieldDetails;
 
 @Service
@@ -95,6 +96,10 @@ public class GppFieldDetailsService {
             return getAllGppFieldDetails();
         }
         return gppFieldDetailsRepository.searchByKeywordAndValidation(keyword, validation);
+    }
+
+	 public List<GppRenameDto> getAllGppRenames() {
+        return gppFieldDetailsRepository.findAllGppRenames();
     }
 }
 

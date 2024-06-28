@@ -31,6 +31,9 @@ public class SotGppRenameFieldsMapping {
 	    @Column(name = "rx_sot_gpp_remark")
 	    private String sotGppRemark;
 	    
+	    @Column(name = "rx_gpp_sheet")
+	    private String gppSheet;
+	    
 	    @Column(name = "rx_created_by")
 	    private Integer createdBy;
 
@@ -105,6 +108,14 @@ public class SotGppRenameFieldsMapping {
 
 		public void setModifiedDate(Date modifiedDate) {
 			this.modifiedDate = modifiedDate;
+		}
+
+		public String getGppSheet() {
+			return gppSheet;
+		}
+
+		public void setGppSheet(String gppSheet) {
+			this.gppSheet = gppSheet;
 		}
 	    
 	    
