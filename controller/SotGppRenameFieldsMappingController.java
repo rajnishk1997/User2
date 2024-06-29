@@ -31,40 +31,41 @@ public class SotGppRenameFieldsMappingController {
 		@Autowired
 	    private SotGppRenameFieldsMappingService sotGppRenameFieldsMappingService;
 	    
-	    @PostMapping("/createSotGppMapping")
-	    public ResponseEntity<ReqRes> createSotGppMapping(
-	            @RequestBody SotGppRenameFieldsMappingDto createDto) {
-	        try {
-	            ResponseWrapper<SotGppRenameFieldsMapping> response = sotGppRenameFieldsMappingService.saveSotGppMapping(createDto);
-	            ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), null, "Mapping done successfully");
-	            return ResponseEntity.status(HttpStatus.CREATED).body(reqRes);
-	        } catch (IllegalArgumentException e) {
-	            ReqRes reqRes = new ReqRes(HttpStatus.BAD_REQUEST.value(), "Bad Request", e.getMessage());
-	            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(reqRes);
-	        } catch (Exception e) {
-	            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
-	                    "An error occurred while creating the SOT-GPP Mapping");
-	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(reqRes);
-	        }
-	    }
+		@PostMapping("/createSotGppMapping")
+		public ResponseEntity<ReqRes> createSotGppMapping(
+		        @RequestBody SotGppRenameFieldsMappingDto createDto) {
+		    try {
+		        ResponseWrapper<SotGppRenameFieldsMapping> response = sotGppRenameFieldsMappingService.saveSotGppMapping(createDto);
+		        ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), null, "Mapping done successfully");
+		        return ResponseEntity.status(HttpStatus.CREATED).body(reqRes);
+		    } catch (IllegalArgumentException e) {
+		        ReqRes reqRes = new ReqRes(HttpStatus.BAD_REQUEST.value(), "Bad Request", e.getMessage());
+		        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(reqRes);
+		    } catch (Exception e) {
+		        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
+		                "An error occurred while creating the SOT-GPP Mapping");
+		        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(reqRes);
+		    }
+		}
 
-	    @PutMapping("updateSotGppMapping/{sotGppRid}")
-	    public ResponseEntity<ResponseWrapper<SotGppRenameFieldsMapping>> updateSotGppMapping(
-	            @PathVariable int sotGppRid, @RequestBody SotGppRenameFieldsMappingDto updateDto) {
-	        try {
-	            ResponseWrapper<SotGppRenameFieldsMapping> response = sotGppRenameFieldsMappingService.updateSotGppMapping(sotGppRid, updateDto);
-	            return ResponseEntity.status(HttpStatus.OK).body(response);
-	        } catch (IllegalArgumentException e) {
-	            ReqRes reqRes = new ReqRes(HttpStatus.BAD_REQUEST.value(), "Bad Request", e.getMessage());
-	            ResponseWrapper<SotGppRenameFieldsMapping> response = new ResponseWrapper<>(null, reqRes);
-	            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-	        } catch (Exception e) {
-	            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
-	                    "An error occurred while updating the SOT-GPP Mapping");
-	            ResponseWrapper<SotGppRenameFieldsMapping> response = new ResponseWrapper<>(null, reqRes);
-	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-	        }
-	    }
+		@PutMapping("updateSotGppMapping/{sotGppRid}")
+		public ResponseEntity<ResponseWrapper<SotGppRenameFieldsMapping>> updateSotGppMapping(
+		        @PathVariable int sotGppRid, @RequestBody SotGppRenameFieldsMappingDto updateDto) {
+		    try {
+		        ResponseWrapper<SotGppRenameFieldsMapping> response = sotGppRenameFieldsMappingService.updateSotGppMapping(sotGppRid, updateDto);
+		        return ResponseEntity.status(HttpStatus.OK).body(response);
+		    } catch (IllegalArgumentException e) {
+		        ReqRes reqRes = new ReqRes(HttpStatus.BAD_REQUEST.value(), "Bad Request", e.getMessage());
+		        ResponseWrapper<SotGppRenameFieldsMapping> response = new ResponseWrapper<>(null, reqRes);
+		        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+		    } catch (Exception e) {
+		        ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
+		                "An error occurred while updating the SOT-GPP Mapping");
+		        ResponseWrapper<SotGppRenameFieldsMapping> response = new ResponseWrapper<>(null, reqRes);
+		        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+		    }
+		}
+
 	    
 	    @GetMapping("/mappings/search")
 	    public ResponseEntity<List<SotGppRenameFieldsMapping>> searchMappings(
