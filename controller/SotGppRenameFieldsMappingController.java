@@ -32,8 +32,7 @@ public class SotGppRenameFieldsMappingController {
 	    private SotGppRenameFieldsMappingService sotGppRenameFieldsMappingService;
 	    
 		@PostMapping("/createSotGppMapping")
-		public ResponseEntity<ReqRes> createSotGppMapping(
-		        @RequestBody SotGppRenameFieldsMappingDto createDto) {
+		public ResponseEntity<ReqRes> createSotGppMapping(@RequestBody SotGppRenameFieldsMappingDto createDto) {
 		    try {
 		        ResponseWrapper<SotGppRenameFieldsMapping> response = sotGppRenameFieldsMappingService.saveSotGppMapping(createDto);
 		        ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), null, "Mapping done successfully");

@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.optum.entity.GppFieldDetails;
+import com.optum.entity.GppSheet;
 import com.optum.entity.SotFieldDetails;
 import com.optum.entity.SotGppRenameFieldsMapping;
 
@@ -32,4 +33,6 @@ public interface SotGppRenameFieldsMappingDao extends JpaRepository<SotGppRename
 	    List<SotGppRenameFieldsMapping> searchBySotAndGppRename(@Param("sotRename") String sotRename, @Param("gppRename") String gppRename);
 	  
 	  Optional<SotGppRenameFieldsMapping> findBySotGppRid(int sotGppRid);
+	  
+	  SotGppRenameFieldsMapping findBySotFieldDetailsAndGppFieldDetailsAndGppSheet(SotFieldDetails sotFieldDetails, GppFieldDetails gppFieldDetails, GppSheet gppSheet);
 }

@@ -5,7 +5,7 @@ public class SotGppRenameFieldsMappingDto {
 	 private int sotRid;
 	    private int gppRid;
 	    private String sotGppRemark;
-	    private String gppSheet;
+	    private Long gppsheetRid;
 	    private int currentUserId;
 		public int getSotRid() {
 			return sotRid;
@@ -25,17 +25,17 @@ public class SotGppRenameFieldsMappingDto {
 		public void setSotGppRemark(String sotGppRemark) {
 			this.sotGppRemark = sotGppRemark;
 		}
-		public String getGppSheet() {
-			return gppSheet;
-		}
-		public void setGppSheet(String gppSheet) {
-			this.gppSheet = gppSheet;
-		}
 		public int getCurrentUserId() {
 			return currentUserId;
 		}
 		public void setCurrentUserId(int currentUserId) {
 			this.currentUserId = currentUserId;
+		}
+		public Long getGppsheetRid() {
+			return gppsheetRid;
+		}
+		public void setGppsheetRid(Long gppsheetRid) {
+			this.gppsheetRid = gppsheetRid;
 		}
 
 }

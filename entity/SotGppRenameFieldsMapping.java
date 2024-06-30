@@ -28,11 +28,12 @@ public class SotGppRenameFieldsMapping {
 	    @JoinColumn(name = "gpp_field_rename", referencedColumnName = "rx_gpp_field_rename")
 	    private GppFieldDetails gppFieldDetails;
 	    
+	    @ManyToOne
+	    @JoinColumn(name = "gppsheet_rid", referencedColumnName = "gppsheet_rid")
+	    private GppSheet GppSheet;
+	    
 	    @Column(name = "rx_sot_gpp_remark")
 	    private String sotGppRemark;
-	    
-	    @Column(name = "rx_gpp_sheet")
-	    private String gppSheet;
 	    
 	    @Column(name = "rx_created_by")
 	    private Integer createdBy;
@@ -110,13 +111,13 @@ public class SotGppRenameFieldsMapping {
 			this.modifiedDate = modifiedDate;
 		}
 
-		public String getGppSheet() {
-			return gppSheet;
+		public GppSheet getGppSheet() {
+		    return GppSheet;
 		}
 
-		public void setGppSheet(String gppSheet) {
-			this.gppSheet = gppSheet;
+		public void setGppSheet(GppSheet gppSheet) {
+			this.GppSheet = gppSheet;
 		}
-	    
+		
 	    
 }
