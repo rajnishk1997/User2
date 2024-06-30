@@ -1,2 +1,13 @@
-@Query("SELECT m FROM SotGppRenameFieldsMapping m WHERE (:sotRename IS NULL OR :sotRename = '' OR m.sotFieldDetails.sotFieldRename LIKE %:sotRename%) AND (:gppRename IS NULL OR :gppRename = '' OR m.gppFieldDetails.gppFieldRename LIKE %:gppRename%)")
-List<SotGppRenameFieldsMapping> searchBySotAndGppRename(@Param("sotRename") String sotRename, @Param("gppRename") String gppRename);
+ @PostConstruct
+    @Transactional
+    public void init() {
+        List<String> sheetNames = Arrays.asList(sheets.split(", "));
+        for (String sheetName : sheetNames) {
+            GppSheet gppSheet = gppSheetRepository.findByGppSheetName(sheetName);
+            if (gppSheet == null) {
+                gppSheet = new GppSheet(sheetName, true);
+                gppSheet.setCreatedDate(new Date());
+                gppSheetRepository.save(gppSheet);
+            }
+        }
+    }
