@@ -1,6 +1,7 @@
 package com.optum.dao;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -29,4 +30,6 @@ public interface SotGppRenameFieldsMappingDao extends JpaRepository<SotGppRename
 	
 	  @Query("SELECT m FROM SotGppRenameFieldsMapping m WHERE (:sotRename IS NULL OR :sotRename = '' OR m.sotFieldDetails.sotFieldRename = :sotRename) AND (:gppRename IS NULL OR :gppRename = '' OR m.gppFieldDetails.gppFieldRename = :gppRename)")
 	    List<SotGppRenameFieldsMapping> searchBySotAndGppRename(@Param("sotRename") String sotRename, @Param("gppRename") String gppRename);
+	  
+	  Optional<SotGppRenameFieldsMapping> findBySotGppRid(int sotGppRid);
 }

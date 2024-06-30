@@ -161,6 +161,11 @@ public class SotGppRenameFieldsMappingService {
 	        return sotGppRenameFieldsMappingRepository.searchBySotAndGppRename(sotRename, gppRename);
 	    }
 	}
+	
+	public SotGppRenameFieldsMapping getMappingById(int sotGppRid) {
+        return sotGppRenameFieldsMappingRepository.findBySotGppRid(sotGppRid)
+                .orElseThrow(() -> new IllegalArgumentException("SOT-GPP Mapping not found."));
+    }
 
 
 }
