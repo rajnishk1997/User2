@@ -155,11 +155,12 @@ public class SotGppRenameFieldsMappingService {
 	}
 
 	public List<SotGppRenameFieldsMapping> searchMappings(String sotRename, String gppRename) {
-		if (sotRename == null && gppRename == null) {
-			return sotGppRenameFieldsMappingRepository.findAll();
-		} else {
-			return sotGppRenameFieldsMappingRepository.searchBySotAndGppRename(sotRename, gppRename);
-		}
+	    if ((sotRename == null || sotRename.isEmpty()) && (gppRename == null || gppRename.isEmpty())) {
+	        return sotGppRenameFieldsMappingRepository.findAll();
+	    } else {
+	        return sotGppRenameFieldsMappingRepository.searchBySotAndGppRename(sotRename, gppRename);
+	    }
 	}
+
 
 }

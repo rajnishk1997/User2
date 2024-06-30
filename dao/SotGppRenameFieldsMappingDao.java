@@ -21,15 +21,12 @@ public interface SotGppRenameFieldsMappingDao extends JpaRepository<SotGppRename
 			@Param("sotFieldDetails") SotFieldDetails sotFieldDetails,
 			@Param("gppFieldDetails") GppFieldDetails gppFieldDetails);
 
-	@Query("SELECT s FROM SotGppRenameFieldsMapping s "
-			+ "WHERE (:sotRenameParam IS NULL OR s.sotFieldDetails.sotFieldRename = :sotRenameParam) "
-			+ "AND (:gppRenameParam IS NULL OR s.gppFieldDetails.gppFieldRename = :gppRenameParam)")
-	List<SotGppRenameFieldsMapping> searchBySotAndGppRename(@Param("sotRenameParam") String sotRenameParam,
-			@Param("gppRenameParam") String gppRenameParam);
-
 	@Query("SELECT m FROM SotGppRenameFieldsMapping m WHERE m.sotFieldDetails = :sotFieldDetails")
 	SotGppRenameFieldsMapping findBySotFieldDetails(@Param("sotFieldDetails") SotFieldDetails sotFieldDetails);
 
 	@Query("SELECT m FROM SotGppRenameFieldsMapping m WHERE m.gppFieldDetails = :gppFieldDetails")
 	SotGppRenameFieldsMapping findByGppFieldDetails(@Param("gppFieldDetails") GppFieldDetails gppFieldDetails);
+	
+	  @Query("SELECT m FROM SotGppRenameFieldsMapping m WHERE (:sotRename IS NULL OR :sotRename = '' OR m.sotFieldDetails.sotFieldRename = :sotRename) AND (:gppRename IS NULL OR :gppRename = '' OR m.gppFieldDetails.gppFieldRename = :gppRename)")
+	    List<SotGppRenameFieldsMapping> searchBySotAndGppRename(@Param("sotRename") String sotRename, @Param("gppRename") String gppRename);
 }

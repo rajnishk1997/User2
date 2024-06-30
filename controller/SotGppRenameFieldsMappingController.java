@@ -67,15 +67,16 @@ public class SotGppRenameFieldsMappingController {
 		}
 
 	    
-	    @GetMapping("/mappings/search")
-	    public ResponseEntity<List<SotGppRenameFieldsMapping>> searchMappings(
-	            @RequestParam(required = false) String sotRename,
-	            @RequestParam(required = false) String gppRename) {
-	        try {
-	            List<SotGppRenameFieldsMapping> mappings = sotGppRenameFieldsMappingService.searchMappings(sotRename, gppRename);
-	            return new ResponseEntity<>(mappings, HttpStatus.OK);
-	        } catch (Exception e) {
-	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-	        }
-	    }
+		@GetMapping("/mappings/search")
+		public ResponseEntity<List<SotGppRenameFieldsMapping>> searchMappings(
+		        @RequestParam(required = false) String sotRename,
+		        @RequestParam(required = false) String gppRename) {
+		    try {
+		        List<SotGppRenameFieldsMapping> mappings = sotGppRenameFieldsMappingService.searchMappings(sotRename, gppRename);
+		        return new ResponseEntity<>(mappings, HttpStatus.OK);
+		    } catch (Exception e) {
+		        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		    }
+		}
+
 }
