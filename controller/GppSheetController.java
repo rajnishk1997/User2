@@ -6,9 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.optum.dao.GppSheetDao;
-import com.optum.entity.GppSheet;
+import com.optum.dto.GppSheetDto;
+import com.optum.service.GppSheetService;
 
 import java.util.List;
 
@@ -16,17 +15,13 @@ import java.util.List;
 @RequestMapping("/api/gpp-sheets")
 public class GppSheetController {
 
-    private final GppSheetDao gppSheetRepository;
-
     @Autowired
-    public GppSheetController(GppSheetDao gppSheetRepository) {
-        this.gppSheetRepository = gppSheetRepository;
-    }
-
+    private GppSheetService gppSheetService;
+    
     @GetMapping("/getAllGppSheets")
-    public ResponseEntity<List<GppSheet>> getAllGppSheets() {
+    public ResponseEntity<List<GppSheetDto>> getAllGppSheets() {
         try {
-            List<GppSheet> gppSheets = gppSheetRepository.findAll();
+            List<GppSheetDto> gppSheets = gppSheetService.getAllGppSheets();
             return new ResponseEntity<>(gppSheets, HttpStatus.OK);
         } catch (Exception e) {
             // Log the exception or handle it as per your application's error handling strategy
