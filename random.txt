@@ -1,9 +1,54 @@
- import com.fasterxml.jackson.databind.annotation.JsonSerialize;
- @JsonSerialize(using = CustomDateSerializer.class)
-    private Date timestamp;
+public List<AuditTrail> filterAuditTrail(String userName, String action, Date fromDate, Date toDate) {
+    Specification<AuditTrail> spec = Specification.where(null);
+
+    if (userName != null) {
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.equal(root.get("userId"), getUserIdFromUserName(userName)));
+    }
+
+    if (action != null) {
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.equal(root.get("action"), action));
+    }
+
+    if (fromDate != null) {
+        // Log fromDate for debugging
+        System.out.println("fromDate: " + fromDate);
+    }
+
+    if (toDate != null) {
+        // Add one day to the toDate to include the entire day
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(toDate);
+        cal.add(Calendar.DATE, 1);
+        Date endOfDay = cal.getTime();
+        
+        // Log toDate for debugging
+        System.out.println("toDate: " + endOfDay);
+        
+        if (fromDate != null) {
+            spec = spec.and((root, query, criteriaBuilder) -> 
+                criteriaBuilder.between(root.get("timestamp"), fromDate, endOfDay));
+        } else {
+            spec = spec.and((root, query, criteriaBuilder) -> 
+                criteriaBuilder.lessThanOrEqualTo(root.get("timestamp"), endOfDay));
+        }
+    } else if (fromDate != null) {
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.greaterThanOrEqualTo(root.get("timestamp"), fromDate));
+    }
+
+    Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE, Sort.by("timestamp").descending());
+
+    Page<AuditTrail> pageResult = auditTrailRepository.findAll(spec, pageable);
+
+    return pageResult.getContent();
+}
 	
 	
-	import com.fasterxml.jackson.core.JsonGenerator;
+package com.yourpackage;
+
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 
@@ -11,9 +56,9 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class CustomDateSerializer extends JsonSerializer<Date> {
+public class CustomDateTimeSerializer extends JsonSerializer<Date> {
 
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy");
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 
     @Override
     public void serialize(Date date, JsonGenerator gen, SerializerProvider serializers) throws IOException {
