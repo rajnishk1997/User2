@@ -39,27 +39,11 @@ public class GppSheetConfig {
     @PostConstruct
     @Transactional
     public void init() {
-        try {
-            Resource resource = new ClassPathResource("gppsheet.properties");
-            InputStream inputStream = resource.getInputStream();
-
-            Properties properties = new Properties();
-            properties.load(new BufferedReader(new InputStreamReader(inputStream)));
-
-            List<String> sheetNames = new ArrayList<>();
-            properties.forEach((key, value) -> sheetNames.add(value.toString().trim()));
-
-            saveOrUpdateSheets(sheetNames);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load sheet.properties file.", e);
-        }
-    }
-
-    private void saveOrUpdateSheets(List<String> sheetNames) {
+        List<String> sheetNames = Arrays.asList(sheets.split(", "));
         for (String sheetName : sheetNames) {
             GppSheet gppSheet = gppSheetRepository.findByGppSheetName(sheetName);
             if (gppSheet == null) {
-                gppSheet = new GppSheet(sheetName, true); 
+                gppSheet = new GppSheet(sheetName, true);
                 gppSheet.setCreatedDate(new Date());
                 gppSheetRepository.save(gppSheet);
             }
