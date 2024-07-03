@@ -66,8 +66,7 @@ public class ComparisonService {
                 String sotNetwork = (String) sotRecord.get("NETWORK");
 
                 // Get corresponding GPP network name from SOTNetworkMaster
-                SOTNetworkMaster networkMapping = networkMappingRepository.findBySSotNetworkName(sotNetwork)
-                        .orElseThrow(() -> new RuntimeException("Network mapping not found for: " + sotNetwork));
+                SOTNetworkMaster networkMapping = networkMappingRepository.findBySotNetworkName(sotNetwork);
                 String gppNetworkName = networkMapping.getsGppNetworkName();
 
                 // Fetch GPP records based on LIST_NAME and GPP_network_name
@@ -78,29 +77,37 @@ public class ComparisonService {
                     GppFieldValidationResponse response = new GppFieldValidationResponse();
                     Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
 
-                    // Iterate over each mapping and compare fields in SOT and GPP JSON
-                    for (SotGppRenameFieldsMapping mapping : mappings) {
-                        SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
-                        GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
+                    // Iterate over each field in the GPP JSON object
+                    for (Map.Entry<String, Object> gppEntry : gppObject.entrySet()) {
+                        String gppFieldName = gppEntry.getKey();
+                        Object gppFieldValue = gppEntry.getValue();
 
-                        String sotFieldRename = sotFieldDetails.getSotFieldRename();
-                        String gppFieldRename = gppFieldDetails.getGppFieldRename();
-
-                        Object sotValue = sotRecord.get(sotFieldRename);
-                        Object gppValue = gppObject.get(gppFieldRename);
-
-                        // Create field validation object
                         GppFieldValidationResponse.FieldValidation validation = new GppFieldValidationResponse.FieldValidation();
-                        validation.setValue(gppValue);
+                        validation.setValue(gppFieldValue);
+                        validation.setValidationStatus(null); // Default to null, will update if there's a mapping
 
-                        if (sotValue != null && sotValue.equals(gppValue)) {
-                            validation.setValidationStatus("valid");
-                        } else {
-                            validation.setValidationStatus("invalid");
-                            validation.setExpectedValue(sotValue);
+                        // Check if there's a corresponding SOT field based on mappings
+                        for (SotGppRenameFieldsMapping mapping : mappings) {
+                            SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
+                            GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
+
+                            String sotFieldRename = sotFieldDetails.getSotFieldRename();
+                            String gppFieldRename = gppFieldDetails.getGppFieldRename();
+
+                            if (gppFieldName.equals(gppFieldRename)) {
+                                Object sotValue = sotRecord.get(sotFieldRename);
+
+                                if (sotValue != null && sotValue.equals(gppFieldValue)) {
+                                    validation.setValidationStatus("valid");
+                                } else {
+                                    validation.setValidationStatus("invalid");
+                                    validation.setExpectedValue(sotValue);
+                                }
+                                break;
+                            }
                         }
 
-                        gppFields.put(gppFieldRename, validation);
+                        gppFields.put(gppFieldName, validation);
                     }
 
                     response.setGppFields(gppFields);
@@ -117,7 +124,10 @@ public class ComparisonService {
     private List<Map<String, Object>> filterGppJsonList(List<Map<String, Object>> gppJsonList, String listName, String gppNetworkName) {
         List<Map<String, Object>> filteredList = new ArrayList<>();
         for (Map<String, Object> gppObject : gppJsonList) {
-            if (listName.equals(gppObject.get("LIST_NAME")) && gppNetworkName.equals(gppObject.get("NETWORK"))) {
+            String gppListName = gppObject.get("LIST_NAME") != null ? gppObject.get("LIST_NAME").toString() : "";
+            String gppNetwork = gppObject.get("NETWORK") != null ? gppObject.get("NETWORK").toString() : "";
+
+            if (listName.equals(gppListName) && gppNetworkName.equals(gppNetwork)) {
                 filteredList.add(gppObject);
             }
         }
