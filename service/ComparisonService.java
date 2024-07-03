@@ -1,15 +1,15 @@
 package com.optum.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.optum.dao.GppJsonDao;
 import com.optum.dao.SotGppRenameFieldsMappingDao;
 import com.optum.dao.SotJsonDao;
+import com.optum.dao.GppJsonDao;
 import com.optum.dto.response.GppFieldValidationResponse;
-import com.optum.entity.GppJsonEntity;
-import com.optum.entity.GppSheet;
-import com.optum.entity.SotFieldDetails;
 import com.optum.entity.SotGppRenameFieldsMapping;
-import com.optum.entity.SotJsonEntity;
+import com.optum.entity.SotFieldDetails;
+import com.optum.entity.GppFieldDetails;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -26,75 +26,92 @@ public class ComparisonService {
     private SotGppRenameFieldsMappingDao mappingRepository;
 
     @Autowired
-    private SotJsonDao sotJsonDao;
+    private SotJsonDao sotJsonRepository;
 
     @Autowired
-    private GppJsonDao gppJsonDao;
+    private GppJsonDao gppJsonRepository;
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    public List<GppFieldValidationResponse> compareJsonFromDb(int sotJsonId, int gppJsonId) {
+    public List<GppFieldValidationResponse> compareSotAndGppJson(int sotJsonId, int gppJsonId) {
         try {
-            // Retrieve JSON data from database
-            SotJsonEntity sotJsonEntity = sotJsonDao.findById(sotJsonId)
-                    .orElseThrow(() -> new RuntimeException("SOT JSON not found"));
-            String sotJson = sotJsonEntity.getJsonData();
+            // Fetch SOT JSON data by sotJsonId
+            String sotJson = sotJsonRepository.findById(sotJsonId)
+                    .orElseThrow(() -> new RuntimeException("SOT JSON not found")).getJsonData();
+            List<Map<String, Object>> sotJsonList = objectMapper.readValue(sotJson,
+                    new TypeReference<List<Map<String, Object>>>() {});
 
-            GppJsonEntity gppJsonEntity = gppJsonDao.findById(gppJsonId)
-                    .orElseThrow(() -> new RuntimeException("GPP JSON not found"));
-            String gppJson = gppJsonEntity.getJsonData();
+            // Fetch GPP JSON data by gppJsonId
+            String gppJson = gppJsonRepository.findById(gppJsonId)
+                    .orElseThrow(() -> new RuntimeException("GPP JSON not found")).getJsonData();
+            List<Map<String, Object>> gppJsonList = objectMapper.readValue(gppJson,
+                    new TypeReference<List<Map<String, Object>>>() {});
 
-            List<Map<String, Object>> sotList = objectMapper.readValue(sotJson, List.class);
-            List<Map<String, Object>> gppList = objectMapper.readValue(gppJson, List.class);
-            List<SotGppRenameFieldsMapping> mappings = mappingRepository.findBySotFieldDetails_SotRidAndGppFieldDetails_GppRid(sotJsonId, gppJsonId);
+            // Fetch mappings from database based on sotRid and gppRid
+            List<SotGppRenameFieldsMapping> mappings = mappingRepository.findAll();
 
-            List<GppFieldValidationResponse> responses = new ArrayList<>();
+            // Prepare response list
+            List<GppFieldValidationResponse> responseList = new ArrayList<>();
 
-            for (Map<String, Object> sot : sotList) {
-                for (Map<String, Object> gpp : gppList) {
-                    responses.add(generateValidationResponse(sot, gpp, mappings));
+            // Iterate over each GPP JSON object
+            for (Map<String, Object> gppObject : gppJsonList) {
+                GppFieldValidationResponse response = new GppFieldValidationResponse();
+                Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
+
+                // Iterate over each mapping and compare fields in SOT and GPP JSON
+                for (SotGppRenameFieldsMapping mapping : mappings) {
+                    SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
+                    GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
+
+                    String sotFieldRename = sotFieldDetails.getSotFieldRename();
+                    String gppFieldRename = gppFieldDetails.getGppFieldRename();
+
+                    // Check if the SOT field rename exists in SOT JSON
+                    if (containsField(sotJsonList, sotFieldRename)) {
+                        Object sotValue = getSotValue(sotJsonList, sotFieldRename);
+                        Object gppValue = gppObject.get(gppFieldRename);
+
+                        // Create field validation object
+                        GppFieldValidationResponse.FieldValidation validation = new GppFieldValidationResponse.FieldValidation();
+                        validation.setValue(gppValue);
+
+                        if (sotValue != null && sotValue.equals(gppValue)) {
+                            validation.setValidationStatus("valid");
+                        } else {
+                            validation.setValidationStatus("invalid");
+                            validation.setExpectedValue(sotValue);
+                        }
+
+                        gppFields.put(gppFieldRename, validation);
+                    }
                 }
+
+                response.setGppFields(gppFields);
+                responseList.add(response);
             }
-            return responses;
+
+            return responseList;
         } catch (IOException e) {
-            e.printStackTrace();
-            return new ArrayList<>();
+            throw new RuntimeException("Error processing JSON data", e);
         }
     }
 
-    private GppFieldValidationResponse generateValidationResponse(Map<String, Object> sot, Map<String, Object> gpp, List<SotGppRenameFieldsMapping> mappings) {
-        GppFieldValidationResponse response = new GppFieldValidationResponse();
-        Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
-
-        // Populate the GPP fields with their values and validation statuses
-        for (Map.Entry<String, Object> entry : gpp.entrySet()) {
-            String gppFieldName = entry.getKey();
-            Object gppValue = entry.getValue();
-
-            GppFieldValidationResponse.FieldValidation validation = new GppFieldValidationResponse.FieldValidation();
-            validation.setValue(gppValue);
-
-            // Check if this field has a mapping
-            SotGppRenameFieldsMapping mapping = mappings.stream()
-                    .filter(m -> m.getGppFieldDetails().getGppFieldName().equals(gppFieldName))
-                    .findFirst()
-                    .orElse(null);
-
-            if (mapping != null) {
-                String sotFieldName = mapping.getSotFieldDetails().getSotFieldName();
-                Object sotValue = sot.get(sotFieldName);
-                if (sotValue != null && sotValue.equals(gppValue)) {
-                    validation.setValidationStatus("valid");
-                } else {
-                    validation.setValidationStatus("invalid");
-                    validation.setExpectedValue(sotValue);
-                }
+    private boolean containsField(List<Map<String, Object>> jsonList, String fieldName) {
+        for (Map<String, Object> jsonObject : jsonList) {
+            if (jsonObject.containsKey(fieldName)) {
+                return true;
             }
-
-            gppFields.put(gppFieldName, validation);
         }
+        return false;
+    }
 
-        response.setGppFields(gppFields);
-        return response;
+    private Object getSotValue(List<Map<String, Object>> sotJsonList, String sotFieldRename) {
+        for (Map<String, Object> sotObject : sotJsonList) {
+            if (sotObject.containsKey(sotFieldRename)) {
+                return sotObject.get(sotFieldRename);
+            }
+        }
+        return null;
     }
 }
+

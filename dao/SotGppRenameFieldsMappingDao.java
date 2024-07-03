@@ -32,9 +32,11 @@ public interface SotGppRenameFieldsMappingDao extends JpaRepository<SotGppRename
 	  @Query("SELECT m FROM SotGppRenameFieldsMapping m WHERE (:sotRename IS NULL OR :sotRename = '' OR m.sotFieldDetails.sotFieldRename = :sotRename) AND (:gppRename IS NULL OR :gppRename = '' OR m.gppFieldDetails.gppFieldRename = :gppRename)")
 	    List<SotGppRenameFieldsMapping> searchBySotAndGppRename(@Param("sotRename") String sotRename, @Param("gppRename") String gppRename);
 	  
-	  Optional<SotGppRenameFieldsMapping> findBySotGppRid(int sotGppRid);
+	  List<SotGppRenameFieldsMapping> findBySotGppRid(int sotGppRid);
 	  
 	  SotGppRenameFieldsMapping findBySotFieldDetailsAndGppFieldDetailsAndGppSheet(SotFieldDetails sotFieldDetails, GppFieldDetails gppFieldDetails, GppSheet gppSheet);
 
 	 List<SotGppRenameFieldsMapping> findBySotFieldDetails_SotRidAndGppFieldDetails_GppRid(int sotRid, int gppRid);
+
+	List<SotGppRenameFieldsMapping> findBySotRidAndGppRid(int sotRid, int gppRid);
 }
