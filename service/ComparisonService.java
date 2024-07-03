@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.optum.dao.SotGppRenameFieldsMappingDao;
 import com.optum.dao.SotJsonDao;
 import com.optum.dao.GppJsonDao;
+import com.optum.dao.SOTNetworkMasterDao;
 import com.optum.dto.response.GppFieldValidationResponse;
 import com.optum.entity.SotGppRenameFieldsMapping;
 import com.optum.entity.SotFieldDetails;
+import com.optum.entity.SotGppNetworkFieldMapping;
 import com.optum.entity.GppFieldDetails;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ public class ComparisonService {
     @Autowired
     private GppJsonDao gppJsonRepository;
 
+    @Autowired
+    private SOTNetworkMasterDao networkMappingRepository; // New DAO for network mapping
+
     private ObjectMapper objectMapper = new ObjectMapper();
 
     public List<GppFieldValidationResponse> compareSotAndGppJson(int sotJsonId, int gppJsonId) {
@@ -38,8 +43,9 @@ public class ComparisonService {
             // Fetch SOT JSON data by sotJsonId
             String sotJson = sotJsonRepository.findById(sotJsonId)
                     .orElseThrow(() -> new RuntimeException("SOT JSON not found")).getJsonData();
-            List<Map<String, Object>> sotJsonList = objectMapper.readValue(sotJson,
-                    new TypeReference<List<Map<String, Object>>>() {});
+            Map<String, Object> sotJsonMap = objectMapper.readValue(sotJson,
+                    new TypeReference<Map<String, Object>>() {});
+            List<Map<String, Object>> dataRecords = (List<Map<String, Object>>) sotJsonMap.get("dataRecords");
 
             // Fetch GPP JSON data by gppJsonId
             String gppJson = gppJsonRepository.findById(gppJsonId)
@@ -47,28 +53,41 @@ public class ComparisonService {
             List<Map<String, Object>> gppJsonList = objectMapper.readValue(gppJson,
                     new TypeReference<List<Map<String, Object>>>() {});
 
-            // Fetch mappings from database based on sotRid and gppRid
+            // Fetch mappings from database
             List<SotGppRenameFieldsMapping> mappings = mappingRepository.findAll();
 
             // Prepare response list
             List<GppFieldValidationResponse> responseList = new ArrayList<>();
 
-            // Iterate over each GPP JSON object
-            for (Map<String, Object> gppObject : gppJsonList) {
-                GppFieldValidationResponse response = new GppFieldValidationResponse();
-                Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
+            // Iterate over each dataRecord in SOT JSON
+            for (Map<String, Object> sotRecord : dataRecords) {
+                String listName = (String) sotRecord.get("LIST_NAME");
+                String sotNetwork = (String) sotRecord.get("NETWORK");
 
-                // Iterate over each mapping and compare fields in SOT and GPP JSON
-                for (SotGppRenameFieldsMapping mapping : mappings) {
-                    SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
-                    GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
+                // Get corresponding GPP network name
+                SotGppNetworkFieldMapping networkMapping = networkMappingRepository.findBySotFieldDetails_SotFieldRename(sotNetwork);
+                if (networkMapping == null) {
+                    throw new RuntimeException("Network mapping not found for: " + sotNetwork);
+                }
+                String gppNetworkName = networkMapping.getGppFieldDetails().getGppFieldRename();
 
-                    String sotFieldRename = sotFieldDetails.getSotFieldRename();
-                    String gppFieldRename = gppFieldDetails.getGppFieldRename();
+                // Fetch GPP records based on LIST_NAME and GPP_network_name
+                List<Map<String, Object>> filteredGppJsonList = filterGppJsonList(gppJsonList, listName, gppNetworkName);
 
-                    // Check if the SOT field rename exists in SOT JSON
-                    if (containsField(sotJsonList, sotFieldRename)) {
-                        Object sotValue = getSotValue(sotJsonList, sotFieldRename);
+                // Iterate over each filtered GPP JSON object
+                for (Map<String, Object> gppObject : filteredGppJsonList) {
+                    GppFieldValidationResponse response = new GppFieldValidationResponse();
+                    Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
+
+                    // Iterate over each mapping and compare fields in SOT and GPP JSON
+                    for (SotGppRenameFieldsMapping mapping : mappings) {
+                        SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
+                        GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
+
+                        String sotFieldRename = sotFieldDetails.getSotFieldRename();
+                        String gppFieldRename = gppFieldDetails.getGppFieldRename();
+
+                        Object sotValue = sotRecord.get(sotFieldRename);
                         Object gppValue = gppObject.get(gppFieldRename);
 
                         // Create field validation object
@@ -84,10 +103,10 @@ public class ComparisonService {
 
                         gppFields.put(gppFieldRename, validation);
                     }
-                }
 
-                response.setGppFields(gppFields);
-                responseList.add(response);
+                    response.setGppFields(gppFields);
+                    responseList.add(response);
+                }
             }
 
             return responseList;
@@ -96,22 +115,15 @@ public class ComparisonService {
         }
     }
 
-    private boolean containsField(List<Map<String, Object>> jsonList, String fieldName) {
-        for (Map<String, Object> jsonObject : jsonList) {
-            if (jsonObject.containsKey(fieldName)) {
-                return true;
+    private List<Map<String, Object>> filterGppJsonList(List<Map<String, Object>> gppJsonList, String listName, String gppNetworkName) {
+        List<Map<String, Object>> filteredList = new ArrayList<>();
+        for (Map<String, Object> gppObject : gppJsonList) {
+            if (listName.equals(gppObject.get("LIST_NAME")) && gppNetworkName.equals(gppObject.get("NETWORK"))) {
+                filteredList.add(gppObject);
             }
         }
-        return false;
-    }
-
-    private Object getSotValue(List<Map<String, Object>> sotJsonList, String sotFieldRename) {
-        for (Map<String, Object> sotObject : sotJsonList) {
-            if (sotObject.containsKey(sotFieldRename)) {
-                return sotObject.get(sotFieldRename);
-            }
-        }
-        return null;
+        return filteredList;
     }
 }
+
 
