@@ -11,6 +11,7 @@ import com.optum.entity.SotGppRenameFieldsMapping;
 import com.optum.entity.SotFieldDetails;
 import com.optum.entity.SotGppNetworkFieldMapping;
 import com.optum.entity.GppFieldDetails;
+import com.optum.entity.SOTNetworkMaster;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -64,12 +65,10 @@ public class ComparisonService {
                 String listName = (String) sotRecord.get("LIST_NAME");
                 String sotNetwork = (String) sotRecord.get("NETWORK");
 
-                // Get corresponding GPP network name
-                SotGppNetworkFieldMapping networkMapping = networkMappingRepository.findBySotFieldDetails_SotFieldRename(sotNetwork);
-                if (networkMapping == null) {
-                    throw new RuntimeException("Network mapping not found for: " + sotNetwork);
-                }
-                String gppNetworkName = networkMapping.getGppFieldDetails().getGppFieldRename();
+                // Get corresponding GPP network name from SOTNetworkMaster
+                SOTNetworkMaster networkMapping = networkMappingRepository.findBySSotNetworkName(sotNetwork)
+                        .orElseThrow(() -> new RuntimeException("Network mapping not found for: " + sotNetwork));
+                String gppNetworkName = networkMapping.getsGppNetworkName();
 
                 // Fetch GPP records based on LIST_NAME and GPP_network_name
                 List<Map<String, Object>> filteredGppJsonList = filterGppJsonList(gppJsonList, listName, gppNetworkName);
