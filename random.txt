@@ -1,10 +1,10 @@
-@EnableJpaRepositories(basePackages = "com.optum.dao")
-@EntityScan(basePackages = "com.optum.entity")
-
-// Fetch SOT and GPP JSON data by uid using EntityManager
+ try {
+        	 // Fetch SOT and GPP JSON data by uid using EntityManager
             Query query = entityManager.createNativeQuery("SELECT gpp_json4, sot_json FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
             query.setParameter("uid", uid);
-            Object[] jsonData = (Object[]) query.getSingleResult();
-            if (jsonData == null || jsonData.length < 2) {
+            List<Object[]> resultList = query.getResultList();
+            if (resultList.isEmpty()) {
                 throw new RuntimeException("Data not found for UID: " + uid);
             }
+
+            Object[] jsonData = resultList.get(0);
