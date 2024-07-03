@@ -170,10 +170,11 @@ public class SotGppRenameFieldsMappingService {
 	}
 	
 	public SotGppRenameFieldsMappingDto getMappingById(int sotGppRid) {
-        SotGppRenameFieldsMapping entity = sotGppRenameFieldsMappingRepository.findBySotGppRid(sotGppRid)
-                .orElseThrow(() -> new IllegalArgumentException("SOT-GPP Mapping not found."));
-        return convertToDto(entity);
-    }
+	    SotGppRenameFieldsMapping entity = sotGppRenameFieldsMappingRepository.findById(sotGppRid)
+	            .orElseThrow(() -> new IllegalArgumentException("SOT-GPP Mapping not found."));
+	    return convertToDto(entity);
+	}
+
 	
 	public SotGppRenameFieldsMappingDto convertToDto(SotGppRenameFieldsMapping entity) {
 	    SotGppRenameFieldsMappingDto dto = new SotGppRenameFieldsMappingDto();
@@ -190,6 +191,5 @@ public class SotGppRenameFieldsMappingService {
 
 	    return dto;
 	}
-
 
 }

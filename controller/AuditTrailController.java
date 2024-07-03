@@ -43,29 +43,6 @@ public class AuditTrailController {
             return new ResponseEntity<>(new ResponseWrapper<>(null, reqRes), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-
-    
-//    @GetMapping("/logs")
-//    public ResponseEntity<ResponseWrapper<Page<AuditTrail>>> getAuditTrails(
-//            @RequestParam(defaultValue = "0") int page) {
-//        int size = 10; // Fixed page size
-//        try {
-//            // Create a pageable object with sorting by timestamp in descending order
-//            Pageable pageable = PageRequest.of(page, size, Sort.by("timestamp").descending());
-//            Page<AuditTrail> auditTrailPage = auditTrailService.getAuditTrails(pageable);
-//
-//            // Create response wrapper
-//            ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), null, "Audit trails retrieved successfully");
-//            ResponseWrapper<Page<AuditTrail>> responseWrapper = new ResponseWrapper<>(auditTrailPage, reqRes);
-//
-//            // Return response entity
-//            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-//        } catch (Exception e) {
-//            // Handle exceptions
-//            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while retrieving audit trails");
-//            return new ResponseEntity<>(new ResponseWrapper<>(null, reqRes), HttpStatus.INTERNAL_SERVER_ERROR);
-//        }
-//    }
     
     @GetMapping("/audit-trail")
     public ResponseEntity<List<AuditTrail>> filterAuditTrail(
