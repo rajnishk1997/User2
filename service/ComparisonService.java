@@ -5,9 +5,11 @@ import com.optum.dao.GppJsonDao;
 import com.optum.dao.SotGppRenameFieldsMappingDao;
 import com.optum.dao.SotJsonDao;
 import com.optum.dto.response.GppFieldValidationResponse;
+import com.optum.entity.GppJsonEntity;
 import com.optum.entity.GppSheet;
+import com.optum.entity.SotFieldDetails;
 import com.optum.entity.SotGppRenameFieldsMapping;
-
+import com.optum.entity.SotJsonEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,22 +26,27 @@ public class ComparisonService {
     private SotGppRenameFieldsMappingDao mappingRepository;
 
     @Autowired
-    private SotJsonDao sotJsonRepository;
+    private SotJsonDao sotJsonDao;
 
     @Autowired
-    private GppJsonDao gppJsonRepository;
+    private GppJsonDao gppJsonDao;
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    public List<GppFieldValidationResponse> compareJsonFromDb(int sotJsonId, int gppJsonId, GppSheet gppSheet) {
+    public List<GppFieldValidationResponse> compareJsonFromDb(int sotJsonId, int gppJsonId) {
         try {
             // Retrieve JSON data from database
-            String sotJson = sotJsonRepository.findById(sotJsonId).orElseThrow(() -> new RuntimeException("SOT JSON not found")).getJsonData();
-            String gppJson = gppJsonRepository.findById(gppJsonId).orElseThrow(() -> new RuntimeException("GPP JSON not found")).getJsonData();
+            SotJsonEntity sotJsonEntity = sotJsonDao.findById(sotJsonId)
+                    .orElseThrow(() -> new RuntimeException("SOT JSON not found"));
+            String sotJson = sotJsonEntity.getJsonData();
+
+            GppJsonEntity gppJsonEntity = gppJsonDao.findById(gppJsonId)
+                    .orElseThrow(() -> new RuntimeException("GPP JSON not found"));
+            String gppJson = gppJsonEntity.getJsonData();
 
             List<Map<String, Object>> sotList = objectMapper.readValue(sotJson, List.class);
             List<Map<String, Object>> gppList = objectMapper.readValue(gppJson, List.class);
-            List<SotGppRenameFieldsMapping> mappings = mappingRepository.findByGppSheet(gppSheet);
+            List<SotGppRenameFieldsMapping> mappings = mappingRepository.findBySotFieldDetails_SotRidAndGppFieldDetails_GppRid(sotJsonId, gppJsonId);
 
             List<GppFieldValidationResponse> responses = new ArrayList<>();
 
@@ -69,9 +76,9 @@ public class ComparisonService {
 
             // Check if this field has a mapping
             SotGppRenameFieldsMapping mapping = mappings.stream()
-                .filter(m -> m.getGppFieldDetails().getGppFieldName().equals(gppFieldName))
-                .findFirst()
-                .orElse(null);
+                    .filter(m -> m.getGppFieldDetails().getGppFieldName().equals(gppFieldName))
+                    .findFirst()
+                    .orElse(null);
 
             if (mapping != null) {
                 String sotFieldName = mapping.getSotFieldDetails().getSotFieldName();
@@ -91,4 +98,3 @@ public class ComparisonService {
         return response;
     }
 }
-
