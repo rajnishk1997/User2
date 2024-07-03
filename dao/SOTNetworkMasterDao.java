@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.optum.entity.SOTNetworkMaster;
+import com.optum.entity.SotGppNetworkFieldMapping;
 @Repository
 public interface SOTNetworkMasterDao  extends JpaRepository<SOTNetworkMaster, Integer> {
 	 @Query("SELECT s FROM SOTNetworkMaster s WHERE " +
@@ -23,4 +24,8 @@ public interface SOTNetworkMasterDao  extends JpaRepository<SOTNetworkMaster, In
 	           "(:keyword IS NULL OR s.sotNetworkName LIKE %:keyword% OR " +
 	           "s.gppNetworkName LIKE %:keyword% OR s.platform.platformName LIKE %:keyword%)")
 	    List<SOTNetworkMaster> searchByKeyword(@Param("keyword") String keyword);
+
+	SotGppNetworkFieldMapping findBySotFieldDetails_SotFieldRename(String sotNetwork);
+
+	SOTNetworkMaster findBySotNetworkName(String sotNetwork);
 }

@@ -16,8 +16,8 @@ public class ComparisonController {
     @Autowired
     private ComparisonService comparisonService;
 
-    @PostMapping("/compareJson")
-    public List<GppFieldValidationResponse> compare(@RequestBody ComparisonRequest request) {
-        return comparisonService.compareJsonFromDb(request.getSotJsonId(), request.getGppJsonId(), request.getGppSheet());
+    @GetMapping("/compare/{uid}")
+    public List<GppFieldValidationResponse> compareSotAndGppJson(@PathVariable int uid) {
+        return comparisonService.compareSotAndGppJson(uid);
     }
 }
