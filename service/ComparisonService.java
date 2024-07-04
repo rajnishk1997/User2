@@ -155,10 +155,8 @@ public class ComparisonService {
                 // Check for replacements
                 if (replacementProperties.containsKey(value)) {
                     value = replacementProperties.getProperty(value);
-                }
-
-                // Process date format
-                if (isDate(value)) {
+                } else if (isDate(value)) {
+                    // Process date format only if not replaced
                     value = reformatDate(value);
                 }
 
