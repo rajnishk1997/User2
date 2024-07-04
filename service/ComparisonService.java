@@ -55,7 +55,9 @@ public class ComparisonService {
 
     public List<GppFieldValidationResponse> compareSotAndGppJson(int uid) {
         try {
-            Query query = entityManager.createNativeQuery("SELECT gpp_json4, sot_json FROM rxcl_audit.rx_sot_gpp_data WHERE uid =" + uid);
+            // Fetch JSON data from the database
+            Query query = entityManager.createNativeQuery("SELECT gpp_json4, sot_json FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
+            query.setParameter("uid", uid);
             List<Object[]> resultList = query.getResultList();
             if (resultList.isEmpty()) {
                 throw new RuntimeException("Data not found for UID: " + uid);
@@ -65,25 +67,19 @@ public class ComparisonService {
             String sotJson = (String) jsonData[1];
             String gppJson = (String) jsonData[0];
 
-            List<Map<String, Object>> sotJsonMap = objectMapper.readValue(sotJson,
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
-            List<Map<String, Object>> dataRecords = (List<Map<String, Object>>) sotJsonMap.get("dataRecords");
+            List<Map<String, Object>> sotJsonList = objectMapper.readValue(sotJson, new TypeReference<List<Map<String, Object>>>() {});
+            List<Map<String, Object>> gppJsonList = objectMapper.readValue(gppJson, new TypeReference<List<Map<String, Object>>>() {});
 
-            List<Map<String, Object>> gppJsonList = objectMapper.readValue(gppJson,
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
+            // Process SOT JSON data
+            List<Map<String, Object>> processedSotJsonList = processSotJson(sotJsonList);
 
-            // Process SOT JSON
-            List<Map<String, Object>> processedSotJsonList = processSotJson(dataRecords);
-
-            // Fetch mappings from database
+            // Fetch mappings from the database
             List<SotGppRenameFieldsMapping> mappings = mappingRepository.findAll();
 
-            // Prepare response list
+            // Prepare the response list
             List<GppFieldValidationResponse> responseList = new ArrayList<>();
 
-            // Iterate over each dataRecord in processed SOT JSON
+            // Iterate over each processed SOT JSON dataRecord
             for (Map<String, Object> sotRecord : processedSotJsonList) {
                 String listName = (String) sotRecord.get("LIST_NAME");
                 String sotNetwork = (String) sotRecord.get("NETWORK");
@@ -92,45 +88,47 @@ public class ComparisonService {
                 SOTNetworkMaster networkMapping = networkMappingRepository.findBySotNetworkName(sotNetwork);
                 String gppNetworkName = networkMapping.getsGppNetworkName();
 
-                // Fetch GPP records based on LIST_NAME and GPP_network_name
-                List<Map<String, Object>> filteredGppJsonList = filterGppJsonList(gppJsonList, listName, gppNetworkName);
+                // Replace NETWORK field in processedSotJsonList with gppNetworkName
+                sotRecord.put("NETWORK", gppNetworkName);
 
-                // Iterate over each filtered GPP JSON object
+                // Filter GPP JSON objects based on LIST_NAME and NETWORK
+                List<Map<String, Object>> filteredGppJsonList = gppJsonList.stream()
+                        .filter(gppObject -> listName.equals(gppObject.get("LIST_NAME")) &&
+                                gppNetworkName.equals(gppObject.get("NETWORK")))
+                        .collect(Collectors.toList());
+
+                // Compare and validate fields for each filtered GPP JSON object
                 for (Map<String, Object> gppObject : filteredGppJsonList) {
                     GppFieldValidationResponse response = new GppFieldValidationResponse();
                     Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
 
-                    // Iterate over each field in the GPP JSON object
-                    for (Map.Entry<String, Object> gppEntry : gppObject.entrySet()) {
-                        String gppFieldName = gppEntry.getKey();
-                        Object gppFieldValue = gppEntry.getValue();
+                    // Iterate over each mapping and compare fields in SOT and GPP JSON
+                    for (SotGppRenameFieldsMapping mapping : mappings) {
+                        SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
+                        GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
 
-                        GppFieldValidationResponse.FieldValidation validation = new GppFieldValidationResponse.FieldValidation();
-                        validation.setValue(gppFieldValue);
-                        validation.setValidationStatus(null); // Default to null, will update if there's a mapping
+                        String sotFieldRename = sotFieldDetails.getSotFieldRename();
+                        String gppFieldRename = gppFieldDetails.getGppFieldRename();
 
-                        // Check if there's a corresponding SOT field based on mappings
-                        for (SotGppRenameFieldsMapping mapping : mappings) {
-                            SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
-                            GppFieldDetails gppFieldDetails = mapping.getGppFieldDetails();
+                        // Add all GPP fields to the response with validation status
+                        for (String key : gppObject.keySet()) {
+                            GppFieldValidationResponse.FieldValidation validation = new GppFieldValidationResponse.FieldValidation();
+                            Object gppValue = gppObject.get(key);
+                            validation.setValue(gppValue);
 
-                            String sotFieldRename = sotFieldDetails.getSotFieldRename();
-                            String gppFieldRename = gppFieldDetails.getGppFieldRename();
-
-                            if (gppFieldName.equals(gppFieldRename)) {
+                            if (sotFieldRename.equals(key)) {
                                 Object sotValue = sotRecord.get(sotFieldRename);
-
-                                if (sotValue != null && sotValue.equals(gppFieldValue)) {
+                                if (sotValue != null && sotValue.equals(gppValue)) {
                                     validation.setValidationStatus("valid");
                                 } else {
                                     validation.setValidationStatus("invalid");
                                     validation.setExpectedValue(sotValue);
                                 }
-                                break;
+                            } else {
+                                validation.setValidationStatus("valid");
                             }
+                            gppFields.put(key, validation);
                         }
-
-                        gppFields.put(gppFieldName, validation);
                     }
 
                     response.setGppFields(gppFields);
@@ -144,43 +142,51 @@ public class ComparisonService {
         }
     }
 
-    private List<Map<String, Object>> processSotJson(List<Map<String, Object>> dataRecords) {
-        List<Map<String, Object>> processedRecords = new ArrayList<>();
-        for (Map<String, Object> record : dataRecords) {
-            Map<String, Object> processedRecord = new HashMap<>();
-            for (Map.Entry<String, Object> entry : record.entrySet()) {
+    private List<Map<String, Object>> processSotJson(List<Map<String, Object>> sotJsonList) {
+        List<Map<String, Object>> processedList = new ArrayList<>();
+
+        for (Map<String, Object> sotRecord : sotJsonList) {
+            Map<String, Object> processedRecord = new HashMap<>(sotRecord);
+
+            for (Map.Entry<String, Object> entry : processedRecord.entrySet()) {
                 String key = entry.getKey();
-                String value = entry.getValue() != null ? entry.getValue().toString().trim() : "";
+                String value = entry.getValue().toString().trim(); // Trim white spaces
 
                 // Check for replacements
                 if (replacementProperties.containsKey(value)) {
                     value = replacementProperties.getProperty(value);
-                } else if (isDate(value)) {
-                    // Process date format only if not replaced
+                }
+
+                // Process date format
+                if (isDate(value)) {
                     value = reformatDate(value);
                 }
 
                 processedRecord.put(key, value);
             }
-            processedRecords.add(processedRecord);
+
+            processedList.add(processedRecord);
         }
-        return processedRecords;
+
+        return processedList;
     }
 
     private boolean isDate(String value) {
+        // Simple check for date format, can be improved with regex or other date validation logic
         return value.matches("\\d{1,2}/\\d{1,2}/\\d{2,4}");
     }
 
-    private String reformatDate(String date) {
-        List<String> formats = Arrays.asList("dd/MM/yyyy", "d/M/yy", "dd/MM/yy");
-        for (String format : formats) {
+    private String reformatDate(String date) throws ParseException {
+        String[] possibleDateFormats = {"dd/MM/yyyy", "d/M/yy", "dd/MM/yy"};
+
+        for (String format : possibleDateFormats) {
             try {
-                String reformattedDate = new SimpleDateFormat("yyMMdd").format(new SimpleDateFormat(format).parse(date));
-                return "1" + reformattedDate;
-            } catch (ParseException ignored) {
+                return "1" + new SimpleDateFormat("yyMMdd").format(new SimpleDateFormat(format).parse(date));
+            } catch (ParseException e) {
+                // Try the next format
             }
         }
-        return date;
+        throw new ParseException("Date format not recognized: " + date, 0);
     }
 
     private List<Map<String, Object>> filterGppJsonList(List<Map<String, Object>> gppJsonList, String listName, String gppNetworkName) {
