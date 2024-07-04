@@ -175,7 +175,8 @@ public class ComparisonService {
         List<String> formats = Arrays.asList("dd/MM/yyyy", "d/M/yy", "dd/MM/yy");
         for (String format : formats) {
             try {
-                return new SimpleDateFormat("MM/dd/yy").format(new SimpleDateFormat(format).parse(date));
+                String reformattedDate = new SimpleDateFormat("yyMMdd").format(new SimpleDateFormat(format).parse(date));
+                return "1" + reformattedDate;
             } catch (ParseException ignored) {
             }
         }
