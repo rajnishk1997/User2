@@ -191,5 +191,13 @@ public class SotGppRenameFieldsMappingService {
 
 	    return dto;
 	}
+	
+	 public boolean existsById(int sotGppRid) {
+	        return sotGppRenameFieldsMappingRepository.existsById(sotGppRid);
+	    }
+
+	    public void deleteById(int sotGppRid) {
+	        sotGppRenameFieldsMappingRepository.deleteById(sotGppRid);
+	    }
 
 }
