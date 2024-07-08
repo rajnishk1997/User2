@@ -3,14 +3,18 @@ package com.optum.service;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.optum.dao.GppFieldDetailsDao;
+import com.optum.dao.SotGppRenameFieldsMappingDao;
 import com.optum.dto.GppFieldDetailsDto;
 import com.optum.dto.GppRenameDto;
 import com.optum.entity.GppFieldDetails;
+import com.optum.entity.SotFieldDetails;
+import com.optum.entity.SotGppRenameFieldsMapping;
 
 @Service
 public class GppFieldDetailsService {
@@ -20,6 +24,8 @@ public class GppFieldDetailsService {
 
     @Autowired
     private AuditTrailService auditTrailService;
+    @Autowired
+   	private SotGppRenameFieldsMappingDao sotGppRenameFieldsMappingRepository;
 
     public GppFieldDetails createGppFieldDetails(GppFieldDetailsDto gppFieldDetailsDto, Integer currentUserRid) {
         GppFieldDetails gppFieldDetails = new GppFieldDetails();
@@ -101,5 +107,24 @@ public class GppFieldDetailsService {
 	 public List<GppRenameDto> getAllGppRenames() {
         return gppFieldDetailsRepository.findAllGppRenames();
     }
+	 
+	  public List<SotFieldDetails> getMappedSotFieldsByGppRid(int gppRid) {
+	        List<SotGppRenameFieldsMapping> mappings = sotGppRenameFieldsMappingRepository.findByGppFieldDetails_GppRid(gppRid);
+	        return mappings.stream()
+	                       .map(SotGppRenameFieldsMapping::getSotFieldDetails)
+	                       .collect(Collectors.toList());
+	    }
+	    
+	    public boolean deleteGppFieldById(int gppRid) {
+	        // First check for mappings
+	        List<SotFieldDetails> sotFieldDetailsList = getMappedSotFieldsByGppRid(gppRid);
+	        if (!sotFieldDetailsList.isEmpty()) {
+	            return false;
+	        }
+
+	        // If no mappings, proceed with delete
+	        gppFieldDetailsRepository.deleteById(gppRid);
+	        return true;
+	    }
 }
 

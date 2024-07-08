@@ -41,4 +41,6 @@ public interface SotGppRenameFieldsMappingDao extends JpaRepository<SotGppRename
 	List<SotGppRenameFieldsMapping> findBySotRidAndGppRid(int sotRid, int gppRid);
 
 	List<SotGppRenameFieldsMapping> findBySotFieldDetails_SotRid(int sotRid);
+
+	List<SotGppRenameFieldsMapping> findByGppFieldDetails_GppRid(int gppRid);
 }

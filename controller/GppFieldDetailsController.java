@@ -1,12 +1,14 @@
 package com.optum.controller;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +23,7 @@ import com.optum.dto.GppFieldDetailsDto;
 import com.optum.dto.GppRenameDto;
 import com.optum.entity.GppFieldDetails;
 import com.optum.entity.ResponseWrapper;
+import com.optum.entity.SotFieldDetails;
 import com.optum.service.GppFieldDetailsService;
 
 @RestController
@@ -168,6 +171,44 @@ public class GppFieldDetailsController {
             long endTime = System.currentTimeMillis();
             long duration = endTime - startTime;
             logger.info("Fetched all GPP renames in " + duration + "ms");
+        }
+    }
+    
+    @DeleteMapping("/deleteGppField/{gppRid}")
+    public ResponseEntity<ResponseWrapper<String>> deleteGppField(@PathVariable int gppRid) {
+        long startTime = System.currentTimeMillis();
+        try {
+            List<SotFieldDetails> mappedSotFields = gppFieldDetailsService.getMappedSotFieldsByGppRid(gppRid);
+
+            if (!mappedSotFields.isEmpty()) {
+                String mappedFields = mappedSotFields.stream()
+                                                     .map(SotFieldDetails::getSotFieldRename)
+                                                     .collect(Collectors.joining(", "));
+                String message = String.format("GppRenameField with ID \"%d\" is being mapped with sotRenameFields \"%s\"", gppRid, mappedFields);
+
+                ReqRes reqRes = new ReqRes(HttpStatus.CONFLICT.value(), "Conflict", message);
+                ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+            boolean isDeleted = gppFieldDetailsService.deleteGppFieldById(gppRid);
+            if (isDeleted) {
+                ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "SUCCESS", "Deleted GPP field successfully");
+                ResponseWrapper<String> response = new ResponseWrapper<>("Deleted successfully", reqRes);
+                return ResponseEntity.status(HttpStatus.OK).body(response);
+            } else {
+                ReqRes reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Not Found", "GPP field not found");
+                ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (Exception e) {
+            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deleting GPP field");
+            ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Processed delete GPP field request in " + duration + "ms");
         }
     }
 
