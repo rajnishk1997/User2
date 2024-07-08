@@ -24,4 +24,6 @@ public interface SotFieldDetailsDao extends JpaRepository<SotFieldDetails, Integ
 	  
 	  @Query("SELECT new com.optum.dto.SotRenameDto(s.sotRid, s.sotFieldRename) FROM SotFieldDetails s")
 	    List<SotRenameDto> findAllSotRenames();
+
+	void deleteBySotFieldRename(String sotFieldRename);
 }

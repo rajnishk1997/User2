@@ -2,6 +2,7 @@ package com.optum.controller;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import com.optum.dao.ReqRes;
 import com.optum.dto.SotFieldDetailsDto;
 import com.optum.dto.SotRenameDto;
+import com.optum.entity.GppFieldDetails;
 import com.optum.entity.RegistrationResponse;
 import com.optum.entity.ResponseWrapper;
 import com.optum.entity.SotFieldDetails;
@@ -153,6 +155,43 @@ public class SotFieldDetailsController {
             long endTime = System.currentTimeMillis();
             long duration = endTime - startTime;
             logger.info("Fetched all SOT renames in " + duration + "ms");
+        }
+    }
+    
+    @DeleteMapping("/deleteSotField/{sotFieldRename}")
+    public ResponseEntity<ResponseWrapper<String>> deleteSotField(@PathVariable String sotFieldRename) {
+        long startTime = System.currentTimeMillis();
+        try {
+            List<GppFieldDetails> mappedGppFields = sotFieldDetailsService.getMappedGppFields(sotFieldRename);
+
+            if (!mappedGppFields.isEmpty()) {
+                String mappedFields = mappedGppFields.stream()
+                                                     .map(GppFieldDetails::getGppFieldRename)
+                                                     .collect(Collectors.joining(", "));
+                String message = String.format("SotRenameField name \"%s\" is being mapped with gppRenameFields \"%s\"", sotFieldRename, mappedFields);
+                ReqRes reqRes = new ReqRes(HttpStatus.CONFLICT.value(), "Conflict", message);
+                ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+            boolean isDeleted = sotFieldDetailsService.deleteSotField(sotFieldRename);
+            if (isDeleted) {
+                ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "SUCCESS", "Deleted SOT field successfully");
+                ResponseWrapper<String> response = new ResponseWrapper<>("Deleted successfully", reqRes);
+                return ResponseEntity.status(HttpStatus.OK).body(response);
+            } else {
+                ReqRes reqRes = new ReqRes(HttpStatus.NOT_FOUND.value(), "Not Found", "SOT field not found");
+                ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (Exception e) {
+            ReqRes reqRes = new ReqRes(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error", "An error occurred while deleting SOT field");
+            ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Processed delete SOT field request in " + duration + "ms");
         }
     }
     

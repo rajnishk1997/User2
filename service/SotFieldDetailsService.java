@@ -3,20 +3,27 @@ package com.optum.service;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.optum.dao.SotFieldDetailsDao;
+import com.optum.dao.SotGppRenameFieldsMappingDao;
 import com.optum.dto.SotFieldDetailsDto;
 import com.optum.dto.SotRenameDto;
+import com.optum.entity.GppFieldDetails;
 import com.optum.entity.SotFieldDetails;
+import com.optum.entity.SotGppRenameFieldsMapping;
 
 @Service
 public class SotFieldDetailsService {
 
     @Autowired
     private SotFieldDetailsDao sotFieldDetailsRepository;
+    
+    @Autowired
+	private SotGppRenameFieldsMappingDao sotGppRenameFieldsMappingRepository;
 
     public SotFieldDetails createSotFieldDetails(SotFieldDetailsDto sotFieldDetailsDto, Integer userId) {
     	 SotFieldDetails sotFieldDetails = new SotFieldDetails();
@@ -61,4 +68,25 @@ public class SotFieldDetailsService {
     public List<SotRenameDto> getAllSotRenames() {
         return sotFieldDetailsRepository.findAllSotRenames();
     }
+    
+    public List<GppFieldDetails> getMappedGppFields(String sotFieldRename) {
+        List<SotGppRenameFieldsMapping> mappings = sotGppRenameFieldsMappingRepository.findBySotFieldDetails_SotFieldRename(sotFieldRename);
+        return mappings.stream()
+                       .map(SotGppRenameFieldsMapping::getGppFieldDetails)
+                       .collect(Collectors.toList());
+    }
+    
+    // Add delete method
+    public boolean deleteSotField(String sotFieldRename) {
+        // First check for mappings
+        List<GppFieldDetails> gppFieldDetailsList = getMappedGppFields(sotFieldRename);
+        if (!gppFieldDetailsList.isEmpty()) {
+            return false;
+        }
+
+        // If no mappings, proceed with delete
+        sotFieldDetailsRepository.deleteBySotFieldRename(sotFieldRename);
+        return true;
+    }
+
 }
