@@ -158,23 +158,23 @@ public class SotFieldDetailsController {
         }
     }
     
-    @DeleteMapping("/deleteSotField/{sotFieldRename}")
-    public ResponseEntity<ResponseWrapper<String>> deleteSotField(@PathVariable String sotFieldRename) {
+    @DeleteMapping("/deleteSotField/{sotRid}")
+    public ResponseEntity<ResponseWrapper<String>> deleteSotField(@PathVariable int sotRid) {
         long startTime = System.currentTimeMillis();
         try {
-            List<GppFieldDetails> mappedGppFields = sotFieldDetailsService.getMappedGppFields(sotFieldRename);
+            List<GppFieldDetails> mappedGppFields = sotFieldDetailsService.getMappedGppFieldsBySotRid(sotRid);
 
             if (!mappedGppFields.isEmpty()) {
                 String mappedFields = mappedGppFields.stream()
                                                      .map(GppFieldDetails::getGppFieldRename)
                                                      .collect(Collectors.joining(", "));
-                String message = String.format("SotRenameField name \"%s\" is being mapped with gppRenameFields \"%s\"", sotFieldRename, mappedFields);
+                String message = String.format("SotRenameField with ID \"%d\" is being mapped with gppRenameFields \"%s\"", sotRid, mappedFields);
                 ReqRes reqRes = new ReqRes(HttpStatus.CONFLICT.value(), "Conflict", message);
                 ResponseWrapper<String> response = new ResponseWrapper<>(null, reqRes);
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
 
-            boolean isDeleted = sotFieldDetailsService.deleteSotField(sotFieldRename);
+            boolean isDeleted = sotFieldDetailsService.deleteSotFieldById(sotRid);
             if (isDeleted) {
                 ReqRes reqRes = new ReqRes(HttpStatus.OK.value(), "SUCCESS", "Deleted SOT field successfully");
                 ResponseWrapper<String> response = new ResponseWrapper<>("Deleted successfully", reqRes);

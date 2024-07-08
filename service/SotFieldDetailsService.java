@@ -69,23 +69,22 @@ public class SotFieldDetailsService {
         return sotFieldDetailsRepository.findAllSotRenames();
     }
     
-    public List<GppFieldDetails> getMappedGppFields(String sotFieldRename) {
-        List<SotGppRenameFieldsMapping> mappings = sotGppRenameFieldsMappingRepository.findBySotFieldDetails_SotFieldRename(sotFieldRename);
+    public List<GppFieldDetails> getMappedGppFieldsBySotRid(int sotRid) {
+        List<SotGppRenameFieldsMapping> mappings = sotGppRenameFieldsMappingRepository.findBySotFieldDetails_SotRid(sotRid);
         return mappings.stream()
                        .map(SotGppRenameFieldsMapping::getGppFieldDetails)
                        .collect(Collectors.toList());
     }
     
-    // Add delete method
-    public boolean deleteSotField(String sotFieldRename) {
+    public boolean deleteSotFieldById(int sotRid) {
         // First check for mappings
-        List<GppFieldDetails> gppFieldDetailsList = getMappedGppFields(sotFieldRename);
+        List<GppFieldDetails> gppFieldDetailsList = getMappedGppFieldsBySotRid(sotRid);
         if (!gppFieldDetailsList.isEmpty()) {
             return false;
         }
 
         // If no mappings, proceed with delete
-        sotFieldDetailsRepository.deleteBySotFieldRename(sotFieldRename);
+        sotFieldDetailsRepository.deleteById(sotRid);
         return true;
     }
 
