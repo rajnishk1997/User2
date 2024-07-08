@@ -10,6 +10,7 @@ import javax.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.optum.dao.ReqRes;
+import com.optum.dao.SOTNetworkMasterDao;
 import com.optum.dto.request.SOTNetworkMasterRequestDTO;
 import com.optum.entity.ResponseWrapper;
 import com.optum.entity.SOTNetworkMaster;
@@ -37,6 +39,8 @@ public class SOTNetworkMasterController {
 	
 	@Autowired
     private AuditTrailService auditTrailService;
+	@Autowired
+	private SOTNetworkMasterDao sotNetworkMasterRepository;
 	
     @PostConstruct
     public void initPlatforms() {
@@ -151,6 +155,30 @@ public class SOTNetworkMasterController {
             e.printStackTrace();
             // Return error response
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to get all network information");
+        }
+    }
+    
+    @DeleteMapping("/deleteNetworkInfo/{id}")
+    public ResponseEntity<String> deleteNetworkInfo(@PathVariable("id") int sRid, @RequestBody int currentUserId) {
+        long startTime = System.currentTimeMillis();
+        try {
+            SOTNetworkMaster networkMaster = sotNetworkMasterRepository.findById(sRid).orElse(null);
+            if (networkMaster == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Network information not found.");
+            }
+
+            String sSotNetworkName = networkMaster.getsSotNetworkName();
+            String sGppNetworkName = networkMaster.getsGppNetworkName();
+           
+            sotNetworkMasterService.deleteById(sRid, sSotNetworkName, sGppNetworkName, currentUserId);
+            return ResponseEntity.status(HttpStatus.OK).body("Network information deleted successfully.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete network information.");
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            logger.info("Delete Network Info Action performed in " + duration + "ms");
         }
     }
 }

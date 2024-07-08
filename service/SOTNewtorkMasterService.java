@@ -189,6 +189,25 @@ public class SOTNewtorkMasterService {
         }
     }
 
+	    public boolean existsById(int sRid) {
+        return sotNetworkMasterRepository.existsById(sRid);
+    }
+
+	    public void deleteById(int sRid, String sSotNetworkName, String sGppNetworkName, int currentUserId) {
+        sotNetworkMasterRepository.deleteById(sRid);
+
+        // Log audit trail asynchronously
+        CompletableFuture.runAsync(() -> {
+            String details = String.format(
+                "SOT Network Name: %s, GPP Network Name: %s, Platform: %s",
+                sSotNetworkName,
+                sGppNetworkName
+            );
+            auditTrailService.logAuditTrailWithUsername("Network Info Deleted", "SUCCESS", details, currentUserId);
+        });
+    }
+
+	
 
 }
 

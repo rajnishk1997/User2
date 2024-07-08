@@ -159,7 +159,7 @@ public class SotFieldDetailsController {
     }
     
     @DeleteMapping("/deleteSotField/{sotRid}")
-    public ResponseEntity<ResponseWrapper<String>> deleteSotField(@PathVariable int sotRid) {
+    public ResponseEntity<ResponseWrapper<String>> deleteNetworkInfo(@PathVariable("id") int sotRid, @RequestBody int currentUserId) {
         long startTime = System.currentTimeMillis();
         try {
             List<GppFieldDetails> mappedGppFields = sotFieldDetailsService.getMappedGppFieldsBySotRid(sotRid);
