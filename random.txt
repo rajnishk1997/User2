@@ -1,4 +1,16 @@
- if (userName != null) {
-        spec = spec.and((root, query, criteriaBuilder) ->
-                criteriaBuilder.like(root.get("userId"), "%" + getUserIdFromUserName(userName) + "%"));
+ @Transactional
+    public void saveValidatedJson(String uid, String responseList) {
+        String query = "UPDATE rx_project_sot SET validated_json = :validatedJson WHERE sotgppid_mapping = :uid";
+        try {
+            entityManager.createNativeQuery(query)
+                    .setParameter("validatedJson", responseList)
+                    .setParameter("uid", uid)
+                    .executeUpdate();
+        } catch (Exception e) {
+            // Handle exception (e.g., log the error)
+            System.err.println("Error updating validated_json: " + e.getMessage());
+            e.printStackTrace();
+            // You can also rethrow the exception if needed
+            throw new RuntimeException("Error updating validated_json", e);
+        }
     }
