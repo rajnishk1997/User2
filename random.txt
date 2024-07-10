@@ -1,10 +1,4 @@
- try {
-        	 // Fetch SOT and GPP JSON data by uid using EntityManager
-            Query query = entityManager.createNativeQuery("SELECT gpp_json4, sot_json FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
-            query.setParameter("uid", uid);
-            List<Object[]> resultList = query.getResultList();
-            if (resultList.isEmpty()) {
-                throw new RuntimeException("Data not found for UID: " + uid);
-            }
-
-            Object[] jsonData = resultList.get(0);
+ if (userName != null) {
+        spec = spec.and((root, query, criteriaBuilder) ->
+                criteriaBuilder.like(root.get("userId"), "%" + getUserIdFromUserName(userName) + "%"));
+    }
