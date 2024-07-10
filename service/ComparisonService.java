@@ -1,10 +1,12 @@
 package com.optum.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.optum.dao.SotGppRenameFieldsMappingDao;
 import com.optum.dao.SotJsonDao;
 import com.optum.dao.GppJsonDao;
+import com.optum.dao.ProjectSOTDao;
 import com.optum.dao.SOTNetworkMasterDao;
 import com.optum.dto.response.GppFieldValidationResponse;
 import com.optum.entity.SotGppRenameFieldsMapping;
@@ -34,10 +36,8 @@ public class ComparisonService {
     private SotGppRenameFieldsMappingDao mappingRepository;
 
     @Autowired
-    private SotJsonDao sotJsonRepository;
+    private ProjectSOTDao projectSOTDao;
 
-    @Autowired
-    private GppJsonDao gppJsonRepository;
 
     @Autowired
     private SOTNetworkMasterDao networkMappingRepository;
@@ -154,6 +154,12 @@ public class ComparisonService {
                     responseList.add(response);
                 }
             }
+            
+            // Convert responseList to JSON string
+            String validatedJson = convertResponseListToJson(responseList);
+
+            // Update validated_json in database
+            projectSOTDao.updateValidationJson(validatedJson, uid);
 
             return responseList;
         } catch (IOException e) {
@@ -161,7 +167,14 @@ public class ComparisonService {
         }
     }
 
-    private List<Map<String, Object>> processSotJson(List<Map<String, Object>> sotJsonList) {
+    public  String convertResponseListToJson(List<GppFieldValidationResponse> responseList) {
+        try {
+            return objectMapper.writeValueAsString(responseList);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Error converting responseList to JSON", e);
+        }
+    }
+	private List<Map<String, Object>> processSotJson(List<Map<String, Object>> sotJsonList) {
         List<Map<String, Object>> processedList = new ArrayList<>();
 
         for (Map<String, Object> sotRecord : sotJsonList) {
