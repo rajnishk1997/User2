@@ -1,16 +1,18 @@
- @Transactional
-    public void saveValidatedJson(String uid, String responseList) {
+   @Transactional
+    public void saveValidatedJson(String uid, List<GppFieldValidationResponse> responseList) {
         String query = "UPDATE rx_project_sot SET validated_json = :validatedJson WHERE sotgppid_mapping = :uid";
         try {
+            String jsonResponse = objectMapper.writeValueAsString(responseList);
             entityManager.createNativeQuery(query)
-                    .setParameter("validatedJson", responseList)
+                    .setParameter("validatedJson", jsonResponse)
                     .setParameter("uid", uid)
                     .executeUpdate();
+        } catch (JsonProcessingException e) {
+            logger.error("Error converting responseList to JSON: {}", e.getMessage());
+            throw new RuntimeException("Error converting responseList to JSON", e);
         } catch (Exception e) {
-            // Handle exception (e.g., log the error)
-            System.err.println("Error updating validated_json: " + e.getMessage());
-            e.printStackTrace();
-            // You can also rethrow the exception if needed
+            logger.error("Error updating validated_json for uid {}: {}", uid, e.getMessage());
+            logger.debug("Exception stack trace", e);
             throw new RuntimeException("Error updating validated_json", e);
         }
     }
