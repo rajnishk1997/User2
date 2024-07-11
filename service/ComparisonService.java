@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +39,8 @@ public class ComparisonService {
 
     @Autowired
     private ProjectSOTDao projectSOTDao;
+    
+    private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
 
     @Autowired
@@ -155,11 +159,19 @@ public class ComparisonService {
                 }
             }
             
-            // Convert responseList to JSON string
-            String validatedJson = convertResponseListToJson(responseList);
+            // Return responseList immediately
+            executorService.execute(() -> {
+                try {
+                    // Convert responseList to JSON string
+                    String validatedJson = convertResponseListToJson(responseList);
 
-            // Update validated_json in database
-            projectSOTDao.updateValidationJson(validatedJson, uid);
+                    // Update validated_json in database
+                    projectSOTDao.updateValidationJson(validatedJson, uid);
+                } catch (Exception e) {
+                    // Handle any exceptions here
+                    e.printStackTrace();
+                }
+            });
 
             return responseList;
         } catch (IOException e) {
