@@ -1,32 +1,8 @@
-private GppJson28FieldValidationResponse compareFields(Map<String, Object> rFields, Map<String, Object> sFields) {
-    GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
-    Map<String, Json28FieldValidation> validationMap = new HashMap<>();
-
-    // Collect all keys from both rFields and sFields
-    Set<String> allKeys = new HashSet<>();
-    allKeys.addAll(rFields.keySet());
-    allKeys.addAll(sFields.keySet());
-
-    for (String key : allKeys) {
-	//If a key is missing in either rFields or sFields, the corresponding value is set to an empty string ("").
-    //If either value is empty, the validationStatus is set to null.
-        String rValue = rFields.containsKey(key) ? String.valueOf(rFields.get(key)) : "";
-        String sValue = sFields.containsKey(key) ? String.valueOf(sFields.get(key)) : "";
-        String validationStatus = (rValue.equals(sValue) && !rValue.isEmpty() && !sValue.isEmpty()) ? "true" : "false";
-
-        // If either value is empty, set validationStatus to null
-        if (rValue.isEmpty() || sValue.isEmpty()) {
-            validationStatus = null;
-        }
-
-        Json28FieldValidation fieldValidation = new Json28FieldValidation();
-        fieldValidation.setValidationStatus(validationStatus);
-        fieldValidation.setSName(key);
-        fieldValidation.setSValue(sValue);
-
-        validationMap.put(key, fieldValidation);
+ private List<Map<String, Object>> findMatchingEntries(List<Map<String, Object>> gppJson28List, String value) {
+        return gppJson28List.stream()
+                .filter(item -> {
+                    String adbotx = (String) item.get("ADBOTX");
+                    return adbotx.equals(value) || adbotx.equals(value.replace("R", "S")) || adbotx.equals(value.replace("R", "SP"));
+                })
+                .collect(Collectors.toList());
     }
-
-    response.setGppJson28Fields(validationMap);
-    return response;
-}
