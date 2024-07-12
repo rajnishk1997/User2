@@ -63,8 +63,10 @@ public class GppJson28Service {
                 List<Map<String, Object>> matchingEntries = findMatchingEntries(filteredList, value);
                 
                 for (Map<String, Object> entry : matchingEntries) {
-                    GppJson28FieldValidationResponse response = compareFields(entry);
-                    responses.add(response);
+                	 for (Map<String, Object> pairedEntry : matchingEntries) {
+                         GppJson28FieldValidationResponse response = compareFields(entry, pairedEntry);
+                         responses.add(response);
+                     }
                 }
             }
 
@@ -72,33 +74,83 @@ public class GppJson28Service {
         }
 
         private List<Map<String, Object>> findMatchingEntries(List<Map<String, Object>> gppJson28List, String value) {
-            return gppJson28List.stream()
-                    .filter(item -> {
-                        String adbotx = (String) item.get("ADBOTX");
-                        return adbotx.endsWith("S") || adbotx.endsWith("SP");
-                    })
+            List<Map<String, Object>> matchedEntries = new ArrayList<>();
+
+            // Step 1: Find the entry with ADAECD equal to value
+            Map<String, Object> targetEntry = gppJson28List.stream()
+                    .filter(item -> value.equals(item.get("ADAECD")))
+                    .findFirst()
+                    .orElse(null);
+
+            if (targetEntry == null) {
+                return matchedEntries; // No matching entry found
+            }
+
+            String targetAdbotx = (String) targetEntry.get("ADBOTX");
+
+            // Step 2: Generate the possible matching ADBOTX values
+            List<String> possibleAdbotxValues = generatePossibleAdbotxValues(targetAdbotx);
+
+            // Step 3: Find the entries with matching ADBOTX values
+            List<Map<String, Object>> potentialMatches = gppJson28List.stream()
+                    .filter(item -> possibleAdbotxValues.contains(item.get("ADBOTX")))
                     .collect(Collectors.toList());
+
+            // Step 4: Narrow down to the exact match by checking ADAECD
+            for (Map<String, Object> entry : potentialMatches) {
+                String entryAdbotx = (String) entry.get("ADBOTX");
+                if (entryAdbotx.equals(targetAdbotx.replace("R", "S"))) {
+                    matchedEntries.add(entry);
+                } else if (entryAdbotx.equals(targetAdbotx.replace("RT", "SP"))) {
+                    matchedEntries.add(entry);
+                } else if (entryAdbotx.equals(targetAdbotx.replace("R", "SP"))) {
+                    matchedEntries.add(entry);
+                } // Add more conditions as needed
+            }
+
+            return matchedEntries;
         }
 
-        private GppJson28FieldValidationResponse compareFields(Map<String, Object> entry) {
+        private List<String> generatePossibleAdbotxValues(String adbotx) {
+            List<String> possibleValues = new ArrayList<>();
+            if (adbotx.endsWith("R")) {
+                possibleValues.add(adbotx.replace("R", "S"));
+            }
+            if (adbotx.endsWith("RT")) {
+                possibleValues.add(adbotx.replace("RT", "SP"));
+            }
+            if (adbotx.endsWith("R")) {
+                possibleValues.add(adbotx.replace("R", "SP"));
+            }
+            // Add more rules as needed
+            return possibleValues;
+        }
+      
+        private GppJson28FieldValidationResponse compareFields(Map<String, Object> entry, Map<String, Object> pairedEntry) {
             GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
             Map<String, GppJson28FieldValidationResponse.Json28FieldValidation> validationMap = new HashMap<>();
 
             Set<String> allKeys = new HashSet<>();
             allKeys.addAll(entry.keySet());
+            allKeys.addAll(pairedEntry.keySet());
 
             for (String key : allKeys) {
                 String entryValue = entry.containsKey(key) ? String.valueOf(entry.get(key)) : "";
-                String validationStatus = "false";
+                String pairedEntryValue = pairedEntry.containsKey(key) ? String.valueOf(pairedEntry.get(key)) : "";
+                String validationStatus;
 
-                if (!entryValue.isEmpty()) {
+                if (entryValue.equals(pairedEntryValue)) {
                     validationStatus = "true";
+                } else if (entryValue.isEmpty() || pairedEntryValue.isEmpty()) {
+                    validationStatus = "null";
+                } else {
+                    validationStatus = "false";
                 }
 
                 GppJson28FieldValidationResponse.Json28FieldValidation fieldValidation = new GppJson28FieldValidationResponse.Json28FieldValidation();
                 fieldValidation.setValidationStatus(validationStatus);
-                fieldValidation.setsValue(key);
-                fieldValidation.setrValue(entryValue);
+                fieldValidation.setsValue(entryValue);
+                fieldValidation.setrValue(pairedEntryValue);
 
                 validationMap.put(key, fieldValidation);
             }
@@ -106,5 +158,6 @@ public class GppJson28Service {
             response.setGppJson28Fields(validationMap);
             return response;
         }
+
     
 }
