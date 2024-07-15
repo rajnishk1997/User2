@@ -1,29 +1,22 @@
-private GppJson28FieldValidationResponse compareFields(Map<String, Object> entry, Map<String, Object> pairedEntry) {
+private GppJson28FieldValidationResponse createValidationResponse(Map<String, Object> entry) {
     GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
-    Map<String, GppJson28FieldValidationResponse.Json28FieldValidation> validationMap = new HashMap<>();
+    Map<String, Json28FieldValidation> validationMap = new HashMap<>();
 
-    Set<String> allKeys = new HashSet<>();
-    allKeys.addAll(entry.keySet());
-    allKeys.addAll(pairedEntry.keySet());
+    Set<String> keys = entry.keySet();
+    for (String key : keys) {
+        Json28FieldValidation fieldValidation = new Json28FieldValidation();
+        fieldValidation.setsValue(String.valueOf(entry.get(key)));
+        fieldValidation.setrValue(String.valueOf(entry.get(key))); // Assuming rValue equals sValue initially
 
-    for (String key : allKeys) {
-        String entryValue = entry.containsKey(key) ? String.valueOf(entry.get(key)) : "";
-        String pairedEntryValue = pairedEntry.containsKey(key) ? String.valueOf(pairedEntry.get(key)) : "";
-        String validationStatus;
-
-        if (entryValue.equals(pairedEntryValue)) {
-            validationStatus = "true";
-        } else if (entryValue.isEmpty() || pairedEntryValue.isEmpty()) {
-            validationStatus = "null";
-        } else {
+        // Determine validation status
+        String validationStatus = "true";
+        if (!Objects.equals(fieldValidation.getsValue(), fieldValidation.getrValue())) {
             validationStatus = "false";
+        } else if (fieldValidation.getsValue() == null || fieldValidation.getrValue() == null) {
+            validationStatus = "null";
         }
 
-        GppJson28FieldValidationResponse.Json28FieldValidation fieldValidation = new GppJson28FieldValidationResponse.Json28FieldValidation();
         fieldValidation.setValidationStatus(validationStatus);
-        fieldValidation.setsValue(entryValue);
-        fieldValidation.setrValue(pairedEntryValue);
-
         validationMap.put(key, fieldValidation);
     }
 
