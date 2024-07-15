@@ -1,15 +1,44 @@
- // Compare and validate fields
-                for (String key : gppJson.keySet()) {
-                    Object rValue = gppJson.get(key);
-                    Object sValue = correspondingRow != null ? correspondingRow.get(key) : "";
+private Map<String, Object> findCorrespondingValue(Map<String, Object> gppJson, String distinctValue, List<Map<String, Object>> filteredList) {
+    Map<String, Object> correspondingRow = null;
 
-                    // Perform your validation logic here based on rValue and sValue
-                    String validationStatusStr = null;
-                    if (Objects.toString(rValue, "").isEmpty() || Objects.toString(sValue, "").isEmpty()) {
-                        validationStatusStr = null;
-                    } else {
-                        boolean validationStatus = Objects.equals(rValue, sValue);
-                        validationStatusStr = validationStatus ? "true" : "false";
+    // Iterate through filteredList to find the corresponding row
+    for (Map<String, Object> row : filteredList) {
+        // Check if the row matches the distinctValue in ADAECD field
+        if (row.containsKey("ADAECD") && row.get("ADAECD").equals(distinctValue)) {
+            // Extract ADBOTX value from the current row
+            Object adbotxValue = row.get("ADBOTX");
+            if (adbotxValue != null) {
+                // Perform the replacement logic based on your requirements
+                String adbotxString = adbotxValue.toString();
+                String replacedValue = replaceValues(adbotxString);
+
+                // Now check if there are other rows in filteredList with this replacedValue in ADBOTX
+                for (Map<String, Object> otherRow : filteredList) {
+                    if (otherRow.containsKey("ADBOTX") && otherRow.get("ADBOTX").equals(replacedValue)) {
+                        // Ensure it's not the same row and ADAECD is a perfect match (e.g., 1R to 1S)
+                        String adaecdValue = (String) row.get("ADAECD");
+                        String otherAdaecdValue = (String) otherRow.get("ADAECD");
+                        if (adaecdValue != null && otherAdaecdValue != null && isPerfectMatch(adaecdValue, otherAdaecdValue)) {
+                            correspondingRow = otherRow;
+                            break; // Found the corresponding value, exit loop
+                        }
                     }
-                    gppJson28Fields.put(key, new Json28FieldValidation(validationStatusStr, Objects.toString(rValue, null), Objects.toString(sValue, null)));
                 }
+
+                if (correspondingRow != null) {
+                    break; // Found the corresponding value, exit loop
+                }
+            }
+        }
+    }
+
+    return correspondingRow;
+}
+
+// Helper method to determine if two ADAECD values are a perfect match
+private boolean isPerfectMatch(String adaecdValue, String otherAdaecdValue) {
+    // Assuming that a perfect match is determined by checking the suffix replacement of R with S
+    // This logic can be adjusted based on your specific requirements
+    return adaecdValue.endsWith("R") && otherAdaecdValue.endsWith("S") &&
+           adaecdValue.substring(0, adaecdValue.length() - 1).equals(otherAdaecdValue.substring(0, otherAdaecdValue.length() - 1));
+}
