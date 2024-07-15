@@ -30,7 +30,7 @@ public class GppJson28Service {
         Set<String> distinct00001Values = extractDistinct00001Values(plancCodeOverrideList);
         List<Map<String, Object>> filteredList = filterByG(gppJson28List);
 
-        return comparePairs(filteredList, distinct00001Values);
+        return validateGppJson28Fields(filteredList, distinct00001Values);
     }
 
     private List<Map<String, Object>> parseJson(String jsonStr) {
@@ -53,7 +53,7 @@ public class GppJson28Service {
                 .collect(Collectors.toList());
     }
 
-    private List<GppJson28FieldValidationResponse> comparePairs(List<Map<String, Object>> filteredList, Set<String> distinct00001Values) {
+    private List<GppJson28FieldValidationResponse> validateGppJson28Fields(List<Map<String, Object>> filteredList, Set<String> distinct00001Values) {
         List<GppJson28FieldValidationResponse> responses = new ArrayList<>();
 
         for (String value : distinct00001Values) {
@@ -64,21 +64,9 @@ public class GppJson28Service {
                 GppJson28FieldValidationResponse response = createValidationResponse(entry);
                 responses.add(response);
             } else if (matchingEntries.size() > 1) {
-                // Handle multiple matching entries scenario
-                Map<String, Object> entryWithR = null;
-                Map<String, Object> entryWithS = null;
-
-                for (Map<String, Object> entry : matchingEntries) {
-                    String adbotx = (String) entry.get("ADBOTX");
-                    if (adbotx.endsWith("R")) {
-                        entryWithR = entry;
-                    } else if (adbotx.endsWith("S")) {
-                        entryWithS = entry;
-                    }
-                }
-
-                if (entryWithR != null && entryWithS != null) {
-                    GppJson28FieldValidationResponse response = createValidationResponse(entryWithR, entryWithS);
+                Map<String, Object> matchedEntry = findMatchedEntry(matchingEntries, value);
+                if (matchedEntry != null) {
+                    GppJson28FieldValidationResponse response = createValidationResponse(matchedEntry);
                     responses.add(response);
                 }
             }
@@ -93,15 +81,31 @@ public class GppJson28Service {
                 .collect(Collectors.toList());
     }
 
+    private Map<String, Object> findMatchedEntry(List<Map<String, Object>> matchingEntries, String value) {
+        for (Map<String, Object> entry : matchingEntries) {
+            String sValue = (String) entry.get("ADAECD");
+            String matchedValue = sValue.replaceFirst("R$", "S");
+
+            for (Map<String, Object> entryToMatch : matchingEntries) {
+                if (matchedValue.equals(entryToMatch.get("ADAECD"))) {
+                    return entryToMatch;
+                }
+            }
+        }
+        return null;
+    }
+
     private GppJson28FieldValidationResponse createValidationResponse(Map<String, Object> entry) {
         GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
         Map<String, Json28FieldValidation> validationMap = new HashMap<>();
 
-        Set<String> keys = entry.keySet();
-        for (String key : keys) {
+        for (String key : entry.keySet()) {
             Json28FieldValidation fieldValidation = new Json28FieldValidation();
             fieldValidation.setsValue(String.valueOf(entry.get(key)));
-            fieldValidation.setrValue(String.valueOf(entry.get(key))); // Assuming rValue equals sValue initially
+
+            // Determine rValue based on the rules for ADBOTX field
+            String rValue = determineRValue(key, fieldValidation.getsValue());
+            fieldValidation.setrValue(rValue);
 
             // Determine validation status
             String validationStatus = "true";
@@ -119,35 +123,22 @@ public class GppJson28Service {
         return response;
     }
 
-    private GppJson28FieldValidationResponse createValidationResponse(Map<String, Object> entryWithR, Map<String, Object> entryWithS) {
-        GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
-        Map<String, Json28FieldValidation> validationMap = new HashMap<>();
-
-        Set<String> allKeys = new HashSet<>(entryWithR.keySet());
-        allKeys.addAll(entryWithS.keySet());
-
-        for (String key : allKeys) {
-            Json28FieldValidation fieldValidation = new Json28FieldValidation();
-            String valueR = entryWithR.containsKey(key) ? String.valueOf(entryWithR.get(key)) : null;
-            String valueS = entryWithS.containsKey(key) ? String.valueOf(entryWithS.get(key)) : null;
-
-            // Determine validation status
-            String validationStatus = "true";
-            if (!Objects.equals(valueR, valueS)) {
-                validationStatus = "false";
-            } else if (valueR == null || valueS == null) {
-                validationStatus = "null";
+    private String determineRValue(String fieldName, String sValue) {
+        if ("ADBOTX".equals(fieldName)) {
+            // Implement your logic to determine rValue based on the rules for ADBOTX field
+            // Example logic:
+            if (sValue.endsWith("RT")) {
+                return sValue.replace("RT", "SP");
+            } else if (sValue.endsWith("R")) {
+                return sValue.replace("R", "S");
+            } else {
+                return sValue; // Default case
             }
-
-            fieldValidation.setValidationStatus(validationStatus);
-            fieldValidation.setsValue(valueS);
-            fieldValidation.setrValue(valueR);
-
-            validationMap.put(key, fieldValidation);
         }
+        // Add more conditions for other fields if needed
 
-        response.setGppJson28Fields(validationMap);
-        return response;
+        // Default case
+        return sValue;
     }
-
 }
+
