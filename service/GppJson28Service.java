@@ -1,28 +1,29 @@
 package com.optum.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.optum.dao.GppJson28Dao;
 import com.optum.dto.response.GppJson28FieldValidationResponse;
 import com.optum.dto.response.GppJson28FieldValidationResponse.Json28FieldValidation;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class GppJson28Service {
 
     @Autowired
-    private GppJson28Dao repository;
-
-    @Autowired
+    private GppJson28Dao gppJson28Dao;
+	
+	 @Autowired
     private ObjectMapper objectMapper;
 
-    public List<GppJson28FieldValidationResponse> getGppJson28ByUid(String uid) {
-        String gppJson28Str = repository.findGppJson28ByUid(uid);
-        String plancCodeOverrideStr = repository.findPlancCodeOverrideByUid(uid);
+    public List<GppJson28FieldValidationResponse> getGppJson28ByUid(int uid) {
+        String gppJson28Str = gppJson28Dao.findGppJson28ByUid(uid);
+        String plancCodeOverrideStr = gppJson28Dao.findPlancCodeOverrideByUid(uid);
 
         List<Map<String, Object>> gppJson28List = parseJson(gppJson28Str);
         List<Map<String, Object>> plancCodeOverrideList = parseJson(plancCodeOverrideStr);
@@ -30,7 +31,7 @@ public class GppJson28Service {
         Set<String> distinct00001Values = extractDistinct00001Values(plancCodeOverrideList);
         List<Map<String, Object>> filteredList = filterByG(gppJson28List);
 
-        return validateGppJson28Fields(filteredList, distinct00001Values);
+        return comparePairs(filteredList, distinct00001Values);
     }
 
     private List<Map<String, Object>> parseJson(String jsonStr) {
@@ -42,103 +43,143 @@ public class GppJson28Service {
     }
 
     private Set<String> extractDistinct00001Values(List<Map<String, Object>> plancCodeOverrideList) {
-        return plancCodeOverrideList.stream()
-                .map(item -> (String) item.get("00001"))
-                .collect(Collectors.toSet());
+        Set<String> distinctValues = new HashSet<>();
+        for (Map<String, Object> entry : plancCodeOverrideList) {
+            if (entry.containsKey("00001")) {
+                distinctValues.add(entry.get("00001").toString());
+            }
+        }
+        return distinctValues;
     }
 
     private List<Map<String, Object>> filterByG(List<Map<String, Object>> gppJson28List) {
-        return gppJson28List.stream()
-                .filter(item -> "02".equals(item.get("G")))
-                .collect(Collectors.toList());
+        List<Map<String, Object>> filteredList = new ArrayList<>();
+        for (Map<String, Object> entry : gppJson28List) {
+            if (entry.containsKey("G") && "02".equals(entry.get("G").toString())) {
+                filteredList.add(entry);
+            }
+        }
+        return filteredList;
     }
 
-    private List<GppJson28FieldValidationResponse> validateGppJson28Fields(List<Map<String, Object>> filteredList, Set<String> distinct00001Values) {
-        List<GppJson28FieldValidationResponse> responses = new ArrayList<>();
+    public List<GppJson28FieldValidationResponse> comparePairs(List<Map<String, Object>> filteredList, Set<String> distinct00001Values) {
+        List<GppJson28FieldValidationResponse> results = new ArrayList<>();
 
-        for (String value : distinct00001Values) {
-            List<Map<String, Object>> matchingEntries = findMatchingEntries(filteredList, value);
+        for (String distinctValue : distinct00001Values) {
+            GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
+            Map<String, Json28FieldValidation> gppJson28Fields = new HashMap<>();
 
-            if (matchingEntries.size() == 1) {
-                Map<String, Object> entry = matchingEntries.get(0);
-                GppJson28FieldValidationResponse response = createValidationResponse(entry);
-                responses.add(response);
-            } else if (matchingEntries.size() > 1) {
-                Map<String, Object> matchedEntry = findMatchedEntry(matchingEntries, value);
-                if (matchedEntry != null) {
-                    GppJson28FieldValidationResponse response = createValidationResponse(matchedEntry);
-                    responses.add(response);
+            for (Map<String, Object> gppJson : filteredList) {
+                if (gppJson.containsValue(distinctValue)) {
+                    Map<String, Object> correspondingRow = findCorrespondingValue(gppJson, filteredList);
+
+                    if (correspondingRow != null) {
+                        // Compare and validate fields
+                        for (String key : gppJson.keySet()) {
+                            Object rValue = gppJson.get(key);
+                            Object sValue = correspondingRow.get(key);
+
+                            // Perform your validation logic here based on rValue and sValue
+                            String validationStatusStr = null;
+                            if (Objects.toString(rValue, "").isEmpty() || Objects.toString(sValue, "").isEmpty()) {
+                                validationStatusStr = null;
+                            } else {
+                                boolean validationStatus = Objects.equals(rValue, sValue);
+                                validationStatusStr = validationStatus ? "true" : "false";
+                            }
+                            gppJson28Fields.put(key, new Json28FieldValidation(validationStatusStr, Objects.toString(rValue, null), Objects.toString(sValue, null)));
+                        }
+                    }
+                }
+            }
+
+            response.setGppJson28Fields(gppJson28Fields);
+            results.add(response);
+        }
+
+        return results;
+    }
+
+
+    private Map<String, Object> findCorrespondingValue(Map<String, Object> rRow, List<Map<String, Object>> filteredList) {
+        Map<String, Object> correspondingRow = null;
+        String adbotxValue = (String) rRow.get("ADBOTX");
+        String adaecdValue = (String) rRow.get("ADAECD");
+
+        if (adbotxValue != null && adaecdValue != null) {
+            // Perform the replacement logic based on your requirements
+            String replacedAdbotxValue = replaceValues(adbotxValue);
+
+            // Now check if there are other rows in filteredList with this replacedValue in ADBOTX
+            for (Map<String, Object> otherRow : filteredList) {
+                if (otherRow.containsKey("ADBOTX") && otherRow.get("ADBOTX").equals(replacedAdbotxValue)) {
+                    String otherAdaecdValue = (String) otherRow.get("ADAECD");
+                    if (isPerfectMatch(adaecdValue, otherAdaecdValue)) {
+                        correspondingRow = otherRow;
+                        break; // Found the corresponding value, exit loop
+                    }
+                }
+            }
+
+            // If no perfect match found with replaced ADBOTX, try replacing ADAECD suffixes
+            if (correspondingRow == null) {
+                String replacedAdaecdValue = replaceSuffix(adaecdValue);
+                for (Map<String, Object> otherRow : filteredList) {
+                    String otherAdaecdValue = (String) otherRow.get("ADAECD");
+                    if (replacedAdaecdValue.equals(otherAdaecdValue)) {
+                        correspondingRow = otherRow;
+                        break; // Found the corresponding value, exit loop
+                    }
                 }
             }
         }
 
-        return responses;
+        return correspondingRow;
     }
 
-    private List<Map<String, Object>> findMatchingEntries(List<Map<String, Object>> gppJson28List, String value) {
-        return gppJson28List.stream()
-                .filter(item -> value.equals(item.get("ADAECD")))
-                .collect(Collectors.toList());
+    // Helper method to determine if two ADAECD values are a perfect match
+    private boolean isPerfectMatch(String adaecdValue, String otherAdaecdValue) {
+        return adaecdValue.endsWith("R") && otherAdaecdValue.endsWith("S") &&
+               adaecdValue.substring(0, adaecdValue.length() - 1).equals(otherAdaecdValue.substring(0, otherAdaecdValue.length() - 1));
     }
 
-    private Map<String, Object> findMatchedEntry(List<Map<String, Object>> matchingEntries, String value) {
-        for (Map<String, Object> entry : matchingEntries) {
-            String sValue = (String) entry.get("ADAECD");
-            String matchedValue = sValue.replaceFirst("R$", "S");
-
-            for (Map<String, Object> entryToMatch : matchingEntries) {
-                if (matchedValue.equals(entryToMatch.get("ADAECD"))) {
-                    return entryToMatch;
-                }
-            }
-        }
-        return null;
+    // Helper method to replace suffixes in ADAECD values
+    private String replaceSuffix(String value) {
+        // Regular expression to replace "R" at the end of the string with "S"
+        return value.replaceAll("R$", "S")
+                    .replaceAll("RT$", "SP")
+                    .replaceAll("R(\\d+)$", "S$1");
     }
 
-    private GppJson28FieldValidationResponse createValidationResponse(Map<String, Object> entry) {
-        GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
-        Map<String, Json28FieldValidation> validationMap = new HashMap<>();
 
-        for (String key : entry.keySet()) {
-            Json28FieldValidation fieldValidation = new Json28FieldValidation();
-            fieldValidation.setsValue(String.valueOf(entry.get(key)));
 
-            // Determine rValue based on the rules for ADBOTX field
-            String rValue = determineRValue(key, fieldValidation.getsValue());
-            fieldValidation.setrValue(rValue);
-
-            // Determine validation status
-            String validationStatus = "true";
-            if (!Objects.equals(fieldValidation.getsValue(), fieldValidation.getrValue())) {
-                validationStatus = "false";
-            } else if (fieldValidation.getsValue() == null || fieldValidation.getrValue() == null) {
-                validationStatus = "null";
-            }
-
-            fieldValidation.setValidationStatus(validationStatus);
-            validationMap.put(key, fieldValidation);
+    private String replaceValues(String adbotxValue) {
+        if (adbotxValue == null || adbotxValue.isEmpty()) {
+            return adbotxValue;
         }
 
-        response.setGppJson28Fields(validationMap);
-        return response;
-    }
-
-    private String determineRValue(String fieldName, String sValue) {
-        if ("ADBOTX".equals(fieldName)) {
-            // Implement your logic to determine rValue based on the rules for ADBOTX field
-            // Example logic:
-            if (sValue.endsWith("RT")) {
-                return sValue.replace("RT", "SP");
-            } else if (sValue.endsWith("R")) {
-                return sValue.replace("R", "S");
-            } else {
-                return sValue; // Default case
-            }
+        // Replace "RT" with "SP" if it appears at the end
+        if (adbotxValue.endsWith("RT")) {
+            adbotxValue = adbotxValue.substring(0, adbotxValue.length() - 2) + "SP";
         }
-        // Add more conditions for other fields if needed
 
-        // Default case
-        return sValue;
+        // Replace "R" with "S" if it appears at the end
+        if (adbotxValue.endsWith("R")) {
+            adbotxValue = adbotxValue.substring(0, adbotxValue.length() - 1) + "S";
+        }
+
+        // Replace "1R" with "1S" if it appears at the end
+        if (adbotxValue.endsWith("1R")) {
+            adbotxValue = adbotxValue.substring(0, adbotxValue.length() - 2) + "1S";
+        }
+
+        // Replace "R2" with "S2" if it appears at the end
+        if (adbotxValue.matches(".*R\\d$")) {
+            adbotxValue = adbotxValue.replaceFirst("R(\\d)$", "S$1");
+        }
+
+        return adbotxValue;
     }
 }
+
 
