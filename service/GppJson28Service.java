@@ -100,9 +100,18 @@ public class GppJson28Service {
         Set<String> keys = entry.keySet();
         for (String key : keys) {
             Json28FieldValidation fieldValidation = new Json28FieldValidation();
-            fieldValidation.setValidationStatus("false");
             fieldValidation.setsValue(String.valueOf(entry.get(key)));
             fieldValidation.setrValue(String.valueOf(entry.get(key))); // Assuming rValue equals sValue initially
+
+            // Determine validation status
+            String validationStatus = "true";
+            if (!Objects.equals(fieldValidation.getsValue(), fieldValidation.getrValue())) {
+                validationStatus = "false";
+            } else if (fieldValidation.getsValue() == null || fieldValidation.getrValue() == null) {
+                validationStatus = "null";
+            }
+
+            fieldValidation.setValidationStatus(validationStatus);
             validationMap.put(key, fieldValidation);
         }
 
@@ -122,14 +131,15 @@ public class GppJson28Service {
             String valueR = entryWithR.containsKey(key) ? String.valueOf(entryWithR.get(key)) : null;
             String valueS = entryWithS.containsKey(key) ? String.valueOf(entryWithS.get(key)) : null;
 
-            if (valueR == null || valueS == null) {
-                fieldValidation.setValidationStatus("null");
-            } else if (valueR.equals(valueS)) {
-                fieldValidation.setValidationStatus("true");
-            } else {
-                fieldValidation.setValidationStatus("false");
+            // Determine validation status
+            String validationStatus = "true";
+            if (!Objects.equals(valueR, valueS)) {
+                validationStatus = "false";
+            } else if (valueR == null || valueS == null) {
+                validationStatus = "null";
             }
 
+            fieldValidation.setValidationStatus(validationStatus);
             fieldValidation.setsValue(valueS);
             fieldValidation.setrValue(valueR);
 
@@ -139,4 +149,5 @@ public class GppJson28Service {
         response.setGppJson28Fields(validationMap);
         return response;
     }
+
 }
