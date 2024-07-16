@@ -1,13 +1,2 @@
-private String replaceSuffix(String value) {
-    // Regular expression to replace "R" at the end of the string with "S"
-    String replacedValue = value.replaceAll("R$", "S")
-                                .replaceAll("RT$", "SP")
-                                .replaceAll("R(\\d+)$", "S$1");
-
-    // If no replacement was made and the value does not end with "S" or "SP", add " SP"
-    if (replacedValue.equals(value) && !replacedValue.endsWith("S") && !replacedValue.endsWith("SP")) {
-        replacedValue += " SP";
-    }
-
-    return replacedValue;
-}
+ @Query("SELECT pd.clientName, pd.cagDetail, pd.projectId, pd.auditDate FROM ProjectDetail pd WHERE pd.sotId = :sotId")
+    Object[] fetchProjectDetailsBySotId(@Param("sotId") Long sotId);
