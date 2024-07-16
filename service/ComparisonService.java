@@ -9,6 +9,7 @@ import com.optum.dao.GppJsonDao;
 import com.optum.dao.ProjectSOTDao;
 import com.optum.dao.SOTNetworkMasterDao;
 import com.optum.dto.response.GppFieldValidationResponse;
+import com.optum.dto.response.GppJson28FieldValidationResponse;
 import com.optum.entity.SotGppRenameFieldsMapping;
 import com.optum.entity.SotFieldDetails;
 import com.optum.entity.SotGppNetworkFieldMapping;
@@ -27,6 +28,7 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -42,6 +44,8 @@ public class ComparisonService {
     
     private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
+    @Autowired
+    private GppJson28Service gppJson28Service;
 
     @Autowired
     private SOTNetworkMasterDao networkMappingRepository;
@@ -69,6 +73,20 @@ public class ComparisonService {
 
     public List<GppFieldValidationResponse> compareSotAndGppJson(int uid) {
         try {
+        	// Call ServiceClass2 asynchronously
+            CompletableFuture<List<GppJson28FieldValidationResponse>> gppJson28ResponseFuture = gppJson28Service.getGppJson28ByUidAsync(uid);
+            // Fetch project details from rx_sot_project_detail table
+            SOTProjectDetail sotProjectDetail = sotProjectDetailDao.findBySotId(sotId);
+            if (sotProjectDetail == null) {
+                throw new RuntimeException("Project details not found for SOT ID: " + sotId);
+            }
+
+            // Populate validateDTO with project details
+            validateDTO.setClientName(sotProjectDetail.getClientName());
+            validateDTO.setCagDetail(sotProjectDetail.getCagDetail());
+            validateDTO.setProjectId(sotProjectDetail.getProjectId());
+            validateDTO.setAuditDate(sotProjectDetail.getAuditDate());
+            validateDTO.setSotId(sotId);
             // Fetch JSON data from the database
             Query query = entityManager.createNativeQuery("SELECT gpp_json4, sot_json FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
             query.setParameter("uid", uid);
@@ -83,7 +101,19 @@ public class ComparisonService {
 
             List<Map<String, Object>> sotJsonList = objectMapper.readValue(sotJson, new TypeReference<List<Map<String, Object>>>() {});
             List<Map<String, Object>> gppJsonList = objectMapper.readValue(gppJson, new TypeReference<List<Map<String, Object>>>() {});
+            
+            Query query1 = entityManager.createNativeQuery("SELECT gpp_json28 FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
+            query.setParameter("uid", uid);
+            String gppJson28String = (String) query1.getSingleResult();
 
+            GppFieldValidationResponse response = new GppFieldValidationResponse();
+
+            if (gppJson28String != null && !gppJson28String.isEmpty()) {
+                List<Map<String, Object>> gppJson28List = parseJson(gppJson28String);
+                response.setGppJson28Fields(processGppJson28(gppJson28List));
+            }
+
+            
             // Process SOT JSON data
             List<Map<String, Object>> processedSotJsonList = processSotJson(sotJsonList);
 
@@ -104,7 +134,7 @@ public class ComparisonService {
 
             // Prepare the response list
             List<GppFieldValidationResponse> responseList = new ArrayList<>();
-
+           
             // Iterate over each processed SOT JSON data record
             for (Map<String, Object> sotRecord : processedSotJsonList) {
                 String listName = (String) sotRecord.get("LIST_NAME");
@@ -124,6 +154,7 @@ public class ComparisonService {
 
                 // Compare and validate fields for each filtered GPP JSON object
                 for (Map<String, Object> gppObject : filteredGppJsonList) {
+                	 int trueCount = 0, falseCount = 0, nullCount = 0;
                     GppFieldValidationResponse response = new GppFieldValidationResponse();
                     Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
 
@@ -141,14 +172,17 @@ public class ComparisonService {
                             if (gppFieldRenames.contains(key)) {
                                 Object sotValue = sotRecord.get(sotFieldRename);
                                 if (sotValue != null && sotValue.equals(gppValue)) {
-                                    validation.setValidationStatus("valid");
+                                    validation.setValidationStatus("true");
+                                    trueCount++;
                                     break;
                                 } else {
-                                    validation.setValidationStatus("invalid");
+                                    validation.setValidationStatus("false");
+                                    falseCount++;
                                     validation.setExpectedValue(sotValue);
                                 }
                             } else {
-                                validation.setValidationStatus("valid");
+                                validation.setValidationStatus("null");
+                                nullCount++;
                             }
                             gppFields.put(key, validation);
                         }
@@ -156,9 +190,22 @@ public class ComparisonService {
 
                     response.setGppFields(gppFields);
                     responseList.add(response);
+                    if (!gppFields.isEmpty()) {
+                        if (trueCount > 0) {
+                            gppJson10Matched.add(trueCount);
+                        }
+                        if (falseCount > 0) {
+                            gppJson10NotMatched.add(falseCount);
+                        }
+                        if (nullCount > 0) {
+                            gppJson10Null.add(nullCount);
+                        }
+                    }
                 }
             }
             
+            // Wait for ServiceClass2 response and update validateDTO with results
+            List<GppJson28FieldValidationResponse> gppJson28Responses = gppJson28ResponseFuture.join();
             // Return responseList immediately
             executorService.execute(() -> {
                 try {
@@ -238,5 +285,90 @@ public class ComparisonService {
                 .filter(gppObject -> listName.equals(gppObject.get("LIST_NAME").toString().trim()) &&
                         gppNetworkName.equals(gppObject.get("NETWORK").toString().trim()))
                 .collect(Collectors.toList());
+    }
+    
+    private List<Map<String, Object>> parseJson(String jsonString) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            return objectMapper.readValue(jsonString, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (IOException e) {
+            throw new RuntimeException("Error parsing JSON", e);
+        }
+    }
+
+    private Map<String, GppFieldValidationResponse.Json28FieldValidation> processGppJson28(List<Map<String, Object>> gppJson28List) {
+        List<Map<String, Object>> filteredList = gppJson28List.stream()
+            .filter(map -> "02".equals(map.get("G")))
+            .collect(Collectors.toList());
+
+        Map<String, Map<String, Object>> groupedData = groupDataByADAECD(filteredList);
+        Map<String, GppFieldValidationResponse.Json28FieldValidation> validationResults = new HashMap<>();
+
+        for (Map.Entry<String, Map<String, Object>> entry : groupedData.entrySet()) {
+            String key = entry.getKey();
+            Map<String, Object> record1 = entry.getValue();
+            Map<String, Object> record2 = groupedData.get(key.replace("S", "R"));
+
+            if (record2 != null) {
+                validationResults.putAll(compareRecords(record1, record2));
+            }
+        }
+
+        return validationResults;
+    }
+
+    private Map<String, Map<String, Object>> groupDataByADAECD(List<Map<String, Object>> data) {
+        Map<String, Map<String, Object>> groupedData = new HashMap<>();
+
+        for (Map<String, Object> record : data) {
+            String adaecd = (String) record.get("ADAECD");
+            if (adaecd != null) {
+                String key = getComparableKey(adaecd.trim());
+                if (key != null) {
+                    groupedData.put(key, record);
+                }
+            }
+        }
+
+        return groupedData;
+    }
+
+    private String getComparableKey(String adaecd) {
+        if (adaecd.endsWith("R") || adaecd.endsWith("RT") || adaecd.matches("R\\d+")) {
+            return adaecd.replace("R", "S");
+        } else if (adaecd.endsWith("S") || adaecd.endsWith("SP") || adaecd.matches("S\\d+")) {
+            return adaecd;
+        }
+        return null; // Only consider R and S endings for validation
+    }
+
+    private Map<String, GppFieldValidationResponse.Json28FieldValidation> compareRecords(Map<String, Object> record1, Map<String, Object> record2) {
+        Map<String, GppFieldValidationResponse.Json28FieldValidation> fieldValidations = new HashMap<>();
+
+        for (Map.Entry<String, Object> entry : record1.entrySet()) {
+            String field = entry.getKey();
+            Object value1 = entry.getValue();
+            Object value2 = record2.get(field);
+
+            if ("ADAECD".equals(field)) {
+                continue; // Skip ADAECD comparison here
+            }
+
+            GppFieldValidationResponse.Json28FieldValidation validation = new GppFieldValidationResponse.Json28FieldValidation();
+            validation.setSName((String) record1.get("ADAECD"));
+            validation.setSValue((String) record2.get("ADAECD"));
+
+            if (value2 == null) {
+                validation.setValidationStatus(null);
+            } else if (value1.equals(value2)) {
+                validation.setValidationStatus("valid");
+            } else {
+                validation.setValidationStatus("invalid");
+            }
+
+            fieldValidations.put(field, validation);
+        }
+
+        return fieldValidations;
     }
 }
