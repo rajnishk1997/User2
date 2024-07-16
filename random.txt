@@ -1,2 +1,11 @@
- @Query("SELECT pd.clientName, pd.cagDetail, pd.projectId, pd.auditDate FROM ProjectDetail pd WHERE pd.sotId = :sotId")
-    Object[] fetchProjectDetailsBySotId(@Param("sotId") Long sotId);
+ @Query("SELECT new com.example.ValidateJsonDTO(pd.clientName, pd.cagDetail, pd.projectId, pd.auditDate) " +
+           "FROM SOTProjectDetail pd WHERE pd.sotId = :sotId")
+    ValidateJsonDTO fetchProjectDetailsBySotId(@Param("sotId") Long sotId);
+	
+	
+	  public ValidateJsonDTO(String clientName, String cagDetail, Long projectId, Date auditDate) {
+        this.clientName = clientName;
+        this.cagDetail = cagDetail;
+        this.projectId = projectId;
+        this.auditDate = auditDate;
+    }
