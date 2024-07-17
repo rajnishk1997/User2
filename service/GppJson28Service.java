@@ -74,34 +74,30 @@ public class GppJson28Service {
 		return filteredList;
 	}
 
-	public GppJson28FieldValidationResponse comparePairs(List<Map<String, Object>> filteredList, Set<String> distinct00001Values) {
-		GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
-	    Map<String, Map<String, GppJson28FieldValidationResponse.Json28FieldValidation>> gppFieldsMap = new HashMap<>();
-	    Map<String, Map<String, GppJson28FieldValidationResponse.Json28FieldValidation>> gppFieldsRMap = new HashMap<>();
+	public GppJson28FieldValidationResponse comparePairs(List<Map<String, Object>> filteredList,
+	        Set<String> distinct00001Values) {
+	    GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
 
+	    List<Map<String, Json28FieldValidation>> gppJson28FieldsList = new ArrayList<>();
 	    int matchCount = 0;
 	    int notMatchCount = 0;
 	    int nullCount = 0;
 
-	    int index = 1;
 	    for (String distinctValue : distinct00001Values) {
-	        Map<String, GppJson28FieldValidationResponse.Json28FieldValidation> gppJson28Fields = new HashMap<>();
-	        Map<String, GppJson28FieldValidationResponse.Json28FieldValidation> gppJson28FieldsR = new HashMap<>();
+	        Map<String, Json28FieldValidation> gppJson28Fields = new HashMap<>();
 
 	        for (Map<String, Object> gppJson : filteredList) {
 	            if (gppJson.containsValue(distinctValue)) {
 	                Map<String, Object> correspondingRow = findCorrespondingValue(gppJson, filteredList);
 
 	                if (correspondingRow != null) {
-	                    // Compare and validate fields
 	                    for (String key : gppJson.keySet()) {
 	                        Object rValue = gppJson.get(key);
 	                        Object sValue = correspondingRow.get(key);
 
-	                        // Perform your validation logic here based on rValue and sValue
-	                        String validationStatusStr = null;
+	                        String validationStatusStr;
 	                        if (Objects.toString(rValue, "").isEmpty() || Objects.toString(sValue, "").isEmpty()) {
-	                            validationStatusStr = "null";
+	                            validationStatusStr = null;
 	                            nullCount++;
 	                        } else {
 	                            boolean validationStatus = Objects.equals(rValue, sValue);
@@ -113,25 +109,21 @@ public class GppJson28Service {
 	                            }
 	                        }
 
-	                        gppJson28Fields.put(key, new GppJson28FieldValidationResponse.Json28FieldValidation(validationStatusStr, Objects.toString(sValue, null)));
-	                        gppJson28FieldsR.put(key, new GppJson28FieldValidationResponse.Json28FieldValidation(validationStatusStr, Objects.toString(rValue, null)));
+	                        gppJson28Fields.put(key, new Json28FieldValidation(validationStatusStr,
+	                                Objects.toString(rValue, null), Objects.toString(sValue, null)));
 	                    }
 	                }
 	            }
 	        }
 
-	        gppFieldsMap.put("gppFields" + index, gppJson28Fields);
-	        gppFieldsRMap.put("gppFields" + index + "_r", gppJson28FieldsR);
-	        index++;
+	        gppJson28FieldsList.add(gppJson28Fields);
 	    }
 
 	    response.setGppJson28Match(matchCount);
 	    response.setGppJson28NotMatch(notMatchCount);
 	    response.setGppJson28Null(nullCount);
-	    response.setGppFields(gppFieldsMap);
-	    response.setGppFieldsR(gppFieldsRMap);
+	    response.setGppJson28Fields(gppJson28FieldsList);
 
-	    // Run the database update task asynchronously
 	    executorService.execute(() -> {
 	        try {
 	            String validatedJson = objectMapper.writeValueAsString(response);
