@@ -20,17 +20,17 @@ public class GppJson28Service {
 
 	@Autowired
 	private GppJson28Dao gppJson28Dao;
-	
-	 @Autowired
-	    private ExecutorService executorService;
+
+	@Autowired
+	private ExecutorService executorService;
 
 	@Autowired
 	private ObjectMapper objectMapper;
-	
-	  @Async
-	    public CompletableFuture<List<GppJson28FieldValidationResponse>> getGppJson28ByUidAsync(int uid) {
-	        return CompletableFuture.supplyAsync(() -> getGppJson28ByUid(uid), executorService);
-	    }
+
+	@Async
+	public CompletableFuture<List<GppJson28FieldValidationResponse>> getGppJson28ByUidAsync(int uid) {
+		return CompletableFuture.supplyAsync(() -> getGppJson28ByUid(uid), executorService);
+	}
 
 	public List<GppJson28FieldValidationResponse> getGppJson28ByUid(int uid) {
 		String gppJson28Str = gppJson28Dao.findGppJson28ByUid(uid);
@@ -74,58 +74,76 @@ public class GppJson28Service {
 		return filteredList;
 	}
 
-	public List<GppJson28FieldValidationResponse> comparePairs(List<Map<String, Object>> filteredList,
-			Set<String> distinct00001Values) {
-		List<GppJson28FieldValidationResponse> results = new ArrayList<>();
+	public GppJson28FieldValidationResponse comparePairs(List<Map<String, Object>> filteredList, Set<String> distinct00001Values) {
+		GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
+	    Map<String, Map<String, GppJson28FieldValidationResponse.Json28FieldValidation>> gppFieldsMap = new HashMap<>();
+	    Map<String, Map<String, GppJson28FieldValidationResponse.Json28FieldValidation>> gppFieldsRMap = new HashMap<>();
 
-		for (String distinctValue : distinct00001Values) {
-			GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
-			Map<String, Json28FieldValidation> gppJson28Fields = new HashMap<>();
+	    int matchCount = 0;
+	    int notMatchCount = 0;
+	    int nullCount = 0;
 
-			for (Map<String, Object> gppJson : filteredList) {
-				if (gppJson.containsValue(distinctValue)) {
-					Map<String, Object> correspondingRow = findCorrespondingValue(gppJson, filteredList);
+	    int index = 1;
+	    for (String distinctValue : distinct00001Values) {
+	        Map<String, GppJson28FieldValidationResponse.Json28FieldValidation> gppJson28Fields = new HashMap<>();
+	        Map<String, GppJson28FieldValidationResponse.Json28FieldValidation> gppJson28FieldsR = new HashMap<>();
 
-					if (correspondingRow != null) {
-						// Compare and validate fields
-						for (String key : gppJson.keySet()) {
-							Object rValue = gppJson.get(key);
-							Object sValue = correspondingRow.get(key);
+	        for (Map<String, Object> gppJson : filteredList) {
+	            if (gppJson.containsValue(distinctValue)) {
+	                Map<String, Object> correspondingRow = findCorrespondingValue(gppJson, filteredList);
 
-							// Perform your validation logic here based on rValue and sValue
-							String validationStatusStr = null;
-							if (Objects.toString(rValue, "").isEmpty() || Objects.toString(sValue, "").isEmpty()) {
-								validationStatusStr = null;
-							} else {
-								boolean validationStatus = Objects.equals(rValue, sValue);
-								validationStatusStr = validationStatus ? "true" : "false";
-							}
-							gppJson28Fields.put(key, new Json28FieldValidation(validationStatusStr,
-									Objects.toString(rValue, null), Objects.toString(sValue, null)));
-						}
-					}
-				}
-			}
+	                if (correspondingRow != null) {
+	                    // Compare and validate fields
+	                    for (String key : gppJson.keySet()) {
+	                        Object rValue = gppJson.get(key);
+	                        Object sValue = correspondingRow.get(key);
 
-			response.setGppJson28Fields(gppJson28Fields);
-			results.add(response);
-		}
-		// Return responseList immediately
-        executorService.execute(() -> {
-            try {
-                // Convert responseList to JSON string
-                String validatedJson = convertResponseListToJson(responseList);
+	                        // Perform your validation logic here based on rValue and sValue
+	                        String validationStatusStr = null;
+	                        if (Objects.toString(rValue, "").isEmpty() || Objects.toString(sValue, "").isEmpty()) {
+	                            validationStatusStr = "null";
+	                            nullCount++;
+	                        } else {
+	                            boolean validationStatus = Objects.equals(rValue, sValue);
+	                            validationStatusStr = validationStatus ? "true" : "false";
+	                            if (validationStatus) {
+	                                matchCount++;
+	                            } else {
+	                                notMatchCount++;
+	                            }
+	                        }
 
-                // Update validated_json in database
-                projectSOTDao.updateValidationJson(validatedJson, uid);
-            } catch (Exception e) {
-                // Handle any exceptions here
-                e.printStackTrace();
-            }
-        });
+	                        gppJson28Fields.put(key, new GppJson28FieldValidationResponse.Json28FieldValidation(validationStatusStr, Objects.toString(sValue, null)));
+	                        gppJson28FieldsR.put(key, new GppJson28FieldValidationResponse.Json28FieldValidation(validationStatusStr, Objects.toString(rValue, null)));
+	                    }
+	                }
+	            }
+	        }
 
-		return results;
+	        gppFieldsMap.put("gppFields" + index, gppJson28Fields);
+	        gppFieldsRMap.put("gppFields" + index + "_r", gppJson28FieldsR);
+	        index++;
+	    }
+
+	    response.setGppJson28Match(matchCount);
+	    response.setGppJson28NotMatch(notMatchCount);
+	    response.setGppJson28Null(nullCount);
+	    response.setGppFields(gppFieldsMap);
+	    response.setGppFieldsR(gppFieldsRMap);
+
+	    // Run the database update task asynchronously
+	    executorService.execute(() -> {
+	        try {
+	            String validatedJson = objectMapper.writeValueAsString(response);
+	            gppJson28Dao.updateValidationJson(validatedJson, uid);
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	        }
+	    });
+
+	    return response;
 	}
+
 
 	private Map<String, Object> findCorrespondingValue(Map<String, Object> rRow,
 			List<Map<String, Object>> filteredList) {

@@ -71,22 +71,18 @@ public class ComparisonService {
         }
     }
 
-    public List<GppFieldValidationResponse> compareSotAndGppJson(int uid) {
+ 
+    public GppFieldValidationResponse compareSotAndGppJson(int uid) {
         try {
-        	// Call ServiceClass2 asynchronously
+            // Call ServiceClass2 asynchronously
             CompletableFuture<List<GppJson28FieldValidationResponse>> gppJson28ResponseFuture = gppJson28Service.getGppJson28ByUidAsync(uid);
+
             // Fetch project details from rx_sot_project_detail table
-            SOTProjectDetail sotProjectDetail = sotProjectDetailDao.findBySotId(sotId);
+            SOTProjectDetail sotProjectDetail = sotProjectDetailDao.fetchProjectDetailsBySotId(sotId);
             if (sotProjectDetail == null) {
                 throw new RuntimeException("Project details not found for SOT ID: " + sotId);
             }
 
-            // Populate validateDTO with project details
-            validateDTO.setClientName(sotProjectDetail.getClientName());
-            validateDTO.setCagDetail(sotProjectDetail.getCagDetail());
-            validateDTO.setProjectId(sotProjectDetail.getProjectId());
-            validateDTO.setAuditDate(sotProjectDetail.getAuditDate());
-            validateDTO.setSotId(sotId);
             // Fetch JSON data from the database
             Query query = entityManager.createNativeQuery("SELECT gpp_json4, sot_json FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
             query.setParameter("uid", uid);
@@ -101,26 +97,22 @@ public class ComparisonService {
 
             List<Map<String, Object>> sotJsonList = objectMapper.readValue(sotJson, new TypeReference<List<Map<String, Object>>>() {});
             List<Map<String, Object>> gppJsonList = objectMapper.readValue(gppJson, new TypeReference<List<Map<String, Object>>>() {});
-            
-            Query query1 = entityManager.createNativeQuery("SELECT gpp_json28 FROM rxcl_audit.rx_sot_gpp_data WHERE uid = :uid");
-            query.setParameter("uid", uid);
-            String gppJson28String = (String) query1.getSingleResult();
 
-            GppFieldValidationResponse response = new GppFieldValidationResponse();
+            // Initialize the response
+            GppFieldValidationResponse validateDataJson = new GppFieldValidationResponse();
+            List<Map<String, GppFieldValidationResponse.FieldValidation>> gppFieldsList = new ArrayList<>();
 
-            if (gppJson28String != null && !gppJson28String.isEmpty()) {
-                List<Map<String, Object>> gppJson28List = parseJson(gppJson28String);
-                response.setGppJson28Fields(processGppJson28(gppJson28List));
-            }
+            int gppJsonMatched = 0;
+            int gppJsonNotMatched = 0;
+            int gppJsonNull = 0;
 
-            
             // Process SOT JSON data
             List<Map<String, Object>> processedSotJsonList = processSotJson(sotJsonList);
 
             // Fetch mappings from the database
             List<SotGppRenameFieldsMapping> mappings = mappingRepository.findAll();
 
-         // Create a map to store SOT to GPP field mappings
+            // Create a map to store SOT to GPP field mappings
             Map<String, List<String>> sotToGppFieldMap = new HashMap<>();
             for (SotGppRenameFieldsMapping mapping : mappings) {
                 SotFieldDetails sotFieldDetails = mapping.getSotFieldDetails();
@@ -132,9 +124,6 @@ public class ComparisonService {
                 sotToGppFieldMap.computeIfAbsent(sotFieldRename, k -> new ArrayList<>()).add(gppFieldRename);
             }
 
-            // Prepare the response list
-            List<GppFieldValidationResponse> responseList = new ArrayList<>();
-           
             // Iterate over each processed SOT JSON data record
             for (Map<String, Object> sotRecord : processedSotJsonList) {
                 String listName = (String) sotRecord.get("LIST_NAME");
@@ -152,12 +141,11 @@ public class ComparisonService {
                                 gppNetworkName.equals(gppObject.get("NETWORK")))
                         .collect(Collectors.toList());
 
+                // Create a map to store field validations for the current SOT record
+                Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
+
                 // Compare and validate fields for each filtered GPP JSON object
                 for (Map<String, Object> gppObject : filteredGppJsonList) {
-                	 int trueCount = 0, falseCount = 0, nullCount = 0;
-                    GppFieldValidationResponse response = new GppFieldValidationResponse();
-                    Map<String, GppFieldValidationResponse.FieldValidation> gppFields = new HashMap<>();
-
                     // Iterate over each SOT field and its mapped GPP fields
                     for (Map.Entry<String, List<String>> entry : sotToGppFieldMap.entrySet()) {
                         String sotFieldRename = entry.getKey();
@@ -167,50 +155,46 @@ public class ComparisonService {
                         for (String key : gppObject.keySet()) {
                             GppFieldValidationResponse.FieldValidation validation = new GppFieldValidationResponse.FieldValidation();
                             Object gppValue = gppObject.get(key);
-                            validation.setValue(gppValue);
+                            validation.setGppValue(gppValue);
 
                             if (gppFieldRenames.contains(key)) {
                                 Object sotValue = sotRecord.get(sotFieldRename);
                                 if (sotValue != null && sotValue.equals(gppValue)) {
                                     validation.setValidationStatus("true");
-                                    trueCount++;
-                                    break;
+                                    gppJsonMatched++;
                                 } else {
                                     validation.setValidationStatus("false");
-                                    falseCount++;
-                                    validation.setExpectedValue(sotValue);
+                                    gppJsonNotMatched++;
+                                    validation.setSotRename(sotFieldRename);
+                                    validation.setSotValue(sotValue);
                                 }
                             } else {
                                 validation.setValidationStatus("null");
-                                nullCount++;
+                                gppJsonNull++;
                             }
                             gppFields.put(key, validation);
                         }
                     }
-
-                    response.setGppFields(gppFields);
-                    responseList.add(response);
-                    if (!gppFields.isEmpty()) {
-                        if (trueCount > 0) {
-                            gppJson10Matched.add(trueCount);
-                        }
-                        if (falseCount > 0) {
-                            gppJson10NotMatched.add(falseCount);
-                        }
-                        if (nullCount > 0) {
-                            gppJson10Null.add(nullCount);
-                        }
-                    }
                 }
+
+                // Add the current field validations map to the list
+                gppFieldsList.add(gppFields);
             }
-            
+
+            // Set the final counts and fields in the response DTO
+            validateDataJson.setGppJsonMatched(gppJsonMatched);
+            validateDataJson.setGppJsonNotMatched(gppJsonNotMatched);
+            validateDataJson.setGppJsonNull(gppJsonNull);
+            validateDataJson.setGppFields(gppFieldsList);
+
             // Wait for ServiceClass2 response and update validateDTO with results
             List<GppJson28FieldValidationResponse> gppJson28Responses = gppJson28ResponseFuture.join();
-            // Return responseList immediately
+
+            // Execute updating validated_json in database asynchronously
             executorService.execute(() -> {
                 try {
                     // Convert responseList to JSON string
-                    String validatedJson = convertResponseListToJson(responseList);
+                    String validatedJson = objectMapper.writeValueAsString(validateDataJson);
 
                     // Update validated_json in database
                     projectSOTDao.updateValidationJson(validatedJson, uid);
@@ -220,11 +204,14 @@ public class ComparisonService {
                 }
             });
 
-            return responseList;
+            return validateDataJson;
         } catch (IOException e) {
             throw new RuntimeException("Error processing JSON data", e);
         }
     }
+
+
+
 
     public  String convertResponseListToJson(List<GppFieldValidationResponse> responseList) {
         try {

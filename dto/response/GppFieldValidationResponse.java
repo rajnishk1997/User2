@@ -1,10 +1,12 @@
 package com.optum.dto.response;
 
-import java.util.Map;
+import java.util.*;
 
 public class GppFieldValidationResponse {
-    private Map<String, FieldValidation> gppFields;
-    private Map<String, Json28FieldValidation> gppJson28Fields;
+	  private int gppJsonMatched;
+	    private int gppJsonNotMatched;
+	    private int gppJsonNull;
+    private List<Map<String, FieldValidation>> gppFields;
 
     public static class FieldValidation {
         private Object gppValue;
@@ -43,12 +45,12 @@ public class GppFieldValidationResponse {
         
     }
 
-	public Map<String, FieldValidation> getGppFields() {
-		return gppFields;
-	}
+    public List<Map<String, FieldValidation>> getGppFields() {
+        return gppFields;
+    }
 
-	public void setGppFields(Map<String, FieldValidation> gppFields) {
-		this.gppFields = gppFields;
-	}
+    public void setGppFields(List<Map<String, FieldValidation>> gppFields) {
+        this.gppFields = gppFields;
+    }
     
 }
