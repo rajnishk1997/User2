@@ -1,3 +1,18 @@
+// Assuming gppFieldsList is already populated
+Map<String, Long> validationStatusCounts = gppFieldsList.stream()
+    .flatMap(gppFields -> gppFields.values().stream())
+    .collect(Collectors.groupingBy(GppFieldValidationResponse.FieldValidation::getValidationStatus, Collectors.counting()));
+
+// Print final counts
+System.out.println("Final counts: null=" + validationStatusCounts.getOrDefault("null", 0L) +
+                   ", true=" + validationStatusCounts.getOrDefault("true", 0L) +
+                   ", false=" + validationStatusCounts.getOrDefault("false", 0L));
+
+
+
+
+
+
 // Count "validationStatus" = "true"
 long trueCount = gppFieldsList.stream()
     .flatMap(gppFields -> gppFields.values().stream())
