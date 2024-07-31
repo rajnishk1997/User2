@@ -1,97 +1,11 @@
-package com.example.demo.entity;
-
-import javax.persistence.*;
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "rx_project_event_details")
-public class ProjectEventDetails {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long rxId;
-
-    private Long sotId;
-    private String status;
-    private String projectNo;
-    private String projectEvent;
-    private LocalDateTime dateTime;
-    private Long createdbyId;
-    private String createdbyName;
-
-    // Getters and Setters
-    // ...
-}
-
-
-
-package com.example.demo.repository;
-
-import com.example.demo.entity.ProjectEventDetails;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-@Repository
-public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
-}
-
-
-
-package com.example.demo.service;
-
-import com.example.demo.entity.ProjectEventDetails;
-import com.example.demo.repository.ProjectEventDetailsRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-public class ProjectEventDetailsService {
-
-    @Autowired
-    private ProjectEventDetailsRepository repository;
-
-    public List<ProjectEventDetails> getAllProjectEventLogs() {
-        return repository.findAll();
+ // Step (iii.a): If value ends with "RT" followed by a number, replace with "SP" followed by the same number
+    if (valueWithoutSpaces.matches(".*RT\\d+$")) {
+        replacedValue = valueWithoutSpaces.replaceAll("RT(\\d+)$", "SP$1");
+        GppJson28Field pair = findInList(filteredList, replacedValue);
+        if (pair != null) return pair;
     }
 
-    public ProjectEventDetails logProjectEvent(ProjectEventDetails projectEventDetails) {
-        return repository.save(projectEventDetails);
-    }
-}
-
-
-
-package com.example.demo.controller;
-
-import com.example.demo.entity.ProjectEventDetails;
-import com.example.demo.service.ProjectEventDetailsService;
-import com.example.demo.wrapper.ResponseWrapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/project-event-details")
-public class ProjectEventDetailsController {
-
-    @Autowired
-    private ProjectEventDetailsService service;
-
-    @GetMapping("/logs")
-    public ResponseEntity<ResponseWrapper<List<ProjectEventDetails>>> getProjectEventLogs() {
-        List<ProjectEventDetails> logs = service.getAllProjectEventLogs();
-        ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(logs);
-        return ResponseEntity.ok(responseWrapper);
-    }
-
-    @PostMapping("/log")
-    public ResponseEntity<ResponseWrapper<ProjectEventDetails>> logProjectEvent(@RequestBody ProjectEventDetails projectEventDetails) {
-        ProjectEventDetails savedDetails = service.logProjectEvent(projectEventDetails);
-        ResponseWrapper<ProjectEventDetails> responseWrapper = new ResponseWrapper<>(savedDetails);
-        return ResponseEntity.ok(responseWrapper);
-    }
-}
+    // Step (iii.b): If no cases above are fulfilled, append "SP" at the end
+    replacedValue = valueWithoutSpaces + "SP";
+    GppJson28Field pair = findInList(filteredList, replacedValue);
+    if (pair != null) return pair;
