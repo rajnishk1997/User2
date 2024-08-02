@@ -1,11 +1,8 @@
- // Step (iii.a): If value ends with "RT" followed by a number, replace with "SP" followed by the same number
-    if (valueWithoutSpaces.matches(".*RT\\d+$")) {
-        replacedValue = valueWithoutSpaces.replaceAll("RT(\\d+)$", "SP$1");
-        GppJson28Field pair = findInList(filteredList, replacedValue);
-        if (pair != null) return pair;
-    }
+  @Query("SELECT p FROM RXSOTProjectDetail p WHERE p.projectCode = :projectCode AND p.isActive = 'Y' ORDER BY p.createdDateTime DESC")
+    List<RXSOTProjectDetail> findByProjectCodeOrderByCreatedDateTimeDesc(@Param("projectCode") String projectCode);
 
-    // Step (iii.b): If no cases above are fulfilled, append "SP" at the end
-    replacedValue = valueWithoutSpaces + "SP";
-    GppJson28Field pair = findInList(filteredList, replacedValue);
-    if (pair != null) return pair;
+    @Query("SELECT p FROM RXSOTProjectDetail p WHERE p.userId = :userId AND p.isActive = 'Y' ORDER BY p.createdDateTime DESC")
+    List<RXSOTProjectDetail> findByUserIdOrderByCreatedDateTimeDesc(@Param("userId") Long userId);
+
+    @Query("SELECT p FROM RXSOTProjectDetail p WHERE p.userId IN :userIds AND p.isActive = 'Y' ORDER BY p.createdDateTime DESC")
+    List<RXSOTProjectDetail> findByUserIdInOrderByCreatedDateTimeDesc(@Param("userIds") List<Long> userIds);
