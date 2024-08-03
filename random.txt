@@ -1,8 +1,46 @@
-  @Query("SELECT p FROM RXSOTProjectDetail p WHERE p.projectCode = :projectCode AND p.isActive = 'Y' ORDER BY p.createdDateTime DESC")
-    List<RXSOTProjectDetail> findByProjectCodeOrderByCreatedDateTimeDesc(@Param("projectCode") String projectCode);
+public class NetworkTypeDTO {
+    private String networkTypeName;
 
-    @Query("SELECT p FROM RXSOTProjectDetail p WHERE p.userId = :userId AND p.isActive = 'Y' ORDER BY p.createdDateTime DESC")
-    List<RXSOTProjectDetail> findByUserIdOrderByCreatedDateTimeDesc(@Param("userId") Long userId);
+    // Getters and Setters
+}
 
-    @Query("SELECT p FROM RXSOTProjectDetail p WHERE p.userId IN :userIds AND p.isActive = 'Y' ORDER BY p.createdDateTime DESC")
-    List<RXSOTProjectDetail> findByUserIdInOrderByCreatedDateTimeDesc(@Param("userIds") List<Long> userIds);
+
+  private List<NetworkTypeDTO> networkType; // Updated field
+  
+  
+    @Value("${network.type.options}")
+    private String networkTypeOptions;
+	
+	
+            // Set networkType if provided
+            if (userRequestDTO.getNetworkType() != null) {
+                List<String> validNetworkTypes = Arrays.asList(networkTypeOptions.split(","));
+                List<String> requestedNetworkTypes = userRequestDTO.getNetworkType().stream()
+                        .map(NetworkTypeDTO::getNetworkTypeName)
+                        .collect(Collectors.toList());
+                for (String type : requestedNetworkTypes) {
+                    if (!validNetworkTypes.contains(type)) {
+                        throw new IllegalArgumentException("Invalid network type: " + type);
+                    }
+                }
+                user.setNetworkType(requestedNetworkTypes);
+            }
+			
+			
+			
+            // Update the networkType
+            if (userRequestDTO.getNetworkType() != null) {
+                List<String> validNetworkTypes = Arrays.asList(networkTypeOptions.split(","));
+                List<String> requestedNetworkTypes = userRequestDTO.getNetworkType().stream()
+                        .map(NetworkTypeDTO::getNetworkTypeName)
+                        .collect(Collectors.toList());
+                for (String type : requestedNetworkTypes) {
+                    if (!validNetworkTypes.contains(type)) {
+                        throw new IllegalArgumentException("Invalid network type: " + type);
+                    }
+                }
+                user.setNetworkType(requestedNetworkTypes);
+            }
+			
+			
+			
