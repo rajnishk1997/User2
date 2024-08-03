@@ -1,82 +1,31 @@
- // Update network types
-    logger.info("Updating network types for user: {}", userName);
-    List<String> existingNetworkTypes = user.getNetworkType(); // Assuming getNetworkType() returns List<String>
-    List<String> newNetworkTypes = userRequestDTO.getNetworkType().stream()
-            .map(NetworkTypeDTO::getNetworkTypeName)
-            .collect(Collectors.toList());
+import javax.persistence.AttributeConverter;
+import javax.persistence.Converter;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
-    // Determine network types to add
-    List<String> networkTypesToAdd = new ArrayList<>(newNetworkTypes);
-    networkTypesToAdd.removeAll(existingNetworkTypes);
+@Converter(autoApply = true)
+public class StringListConverter implements AttributeConverter<List<String>, String> {
 
-    // Determine network types to remove
-    List<String> networkTypesToRemove = new ArrayList<>(existingNetworkTypes);
-    networkTypesToRemove.removeAll(newNetworkTypes);
-
-    // Remove old network types
-    if (!networkTypesToRemove.isEmpty()) {
-        existingNetworkTypes.removeAll(networkTypesToRemove);
-        logger.info("Network types removed: {}", networkTypesToRemove);
+    @Override
+    public String convertToDatabaseColumn(List<String> networkTypes) {
+        if (networkTypes == null) {
+            return null;
+        }
+        return networkTypes.stream().collect(Collectors.joining(","));
     }
 
-    // Add new network types
-    if (!networkTypesToAdd.isEmpty()) {
-        existingNetworkTypes.addAll(networkTypesToAdd);
-        logger.info("Network types added: {}", networkTypesToAdd);
+    @Override
+    public List<String> convertToEntityAttribute(String dbData) {
+        if (dbData == null || dbData.isEmpty()) {
+            return Arrays.asList(); // Return empty list if null or empty string
+        }
+        return Arrays.asList(dbData.split(","));
     }
-
-    // Set updated network types in user
-    user.setNetworkType(existingNetworkTypes);
-
-    // Save updated user
-    userDao.save(user);
-    logger.info("User updated successfully: {}", userName);
-	
-	
-	
-	
-	
-	
-	private UserDTO mapToUserDTO(User user) {
-    Integer managerId = (user.getManager() != null) ? user.getManager().getUserRid() : null;
-
-    // Convert List<String> network types to List<NetworkTypeDTO>
-    List<NetworkTypeDTO> networkTypeDTOs = user.getNetworkType().stream()
-        .map(networkTypeName -> {
-            NetworkTypeDTO dto = new NetworkTypeDTO();
-            dto.setNetworkTypeName(networkTypeName);
-            return dto;
-        })
-        .collect(Collectors.toList());
-
-    UserDTO userDTO = new UserDTO(
-        user.getUserName(),
-        user.getUserFirstName(),
-        user.getUserLastName(),
-        user.getUserPassword(),
-        user.getUserEmail(),
-        user.getUserRid(),
-        managerId
-    );
-    userDTO.setRoles(user.getUserRoles().stream()
-        .map(userRole -> mapToRoleDTO(userRole.getRole()))
-        .collect(Collectors.toList()));
-
-    // Set the network types in the UserDTO
-    userDTO.setNetworkType(networkTypeDTOs);
-
-    return userDTO;
 }
 
 
 
-
-
-  // Handle networkType conversion from List<NetworkTypeDTO> to List<String>
-        List<String> networkTypes = userRequestDTO.getNetworkType().stream()
-            .map(NetworkTypeDTO::getNetworkTypeName)
-            .collect(Collectors.toList());
-        user.setNetworkType(networkTypes);
-
-        // Save the user
-        User savedUser = userDao.save(user);
+  @Column(name = "u_network_type")
+    @Convert(converter = StringListConverter.class)
+    private List<String> networkType;
