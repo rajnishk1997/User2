@@ -1,74 +1,9 @@
-@Transactional
-public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
-    logger.info("Updating user with username: {}", userName);
-    Optional<User> optionalUser = userDao.findByUserName(userName);
-    if (!optionalUser.isPresent()) {
-        logger.warn("User not found with username: {}", userName);
-        return new ReqRes(404, "Not Found", "User not found");
-    }
-
-    User user = optionalUser.get();
-
-    // Update user fields
-    logger.info("Updating user fields for username: {}", userName);
-    user.setUserFirstName(userRequestDTO.getUserFirstName());
-    user.setUserLastName(userRequestDTO.getUserLastName());
-    user.setUserEmail(userRequestDTO.getUserEmail());
-
-    // Set the manager if provided
-    if (userRequestDTO.getManagerId() != null) {
-        User manager = userDao.findById(userRequestDTO.getManagerId()).orElse(null);
-        user.setManager(manager);
-        user.setManagerName(userRequestDTO.getManagerName());
-    }
-
-    // Get new roles from the request
-    Set<Role> newRoles = new HashSet<>();
-    for (RoleDTO roleDTO : userRequestDTO.getRoles()) {
-        Role role = roleDao.findByRoleRid(roleDTO.getRoleRid()).orElseThrow(() -> {
-            logger.error("Role not found with roleRid: {}", roleDTO.getRoleRid());
-            return new RuntimeException("Role not found: " + roleDTO.getRoleRid());
-        });
-        newRoles.add(role);
-    }
-
-    logger.info("New roles prepared for user: {}", userName);
-
-    // Determine roles to be removed
-    Set<UserRole> rolesToRemove = new HashSet<>();
-    for (UserRole userRole : user.getUserRoles()) {
-        if (!newRoles.contains(userRole.getRole())) {
-            rolesToRemove.add(userRole);
-            logger.info("Role marked for removal: {}", userRole.getRole());
-        }
-    }
-
-    // Remove roles not present in newRoles
-    logger.info("Removing roles not present in newRoles for user: {}", userName);
-    for (UserRole userRole : rolesToRemove) {
-        user.removeUserRole(userRole); // Remove from user's collection
-        userRole.setUser(null); // Disassociate from user
-        userRoleDao.delete(userRole); // Delete from database
-        logger.info("Removed UserRole: {}", userRole);
-    }
-
-    // Save changes to the database to ensure roles are removed
-    userRoleDao.flush();
-    userDao.flush(); // Ensure that deletions are flushed to the database
-
-    // Add new roles
-    logger.info("Adding new roles for user: {}", userName);
-    for (Role role : newRoles) {
-        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().equals(role))) {
-            user.addRole(role);
-            logger.info("Role added: {}", role);
-        }
-    }
-
-    // Update network types
+ // Update network types
     logger.info("Updating network types for user: {}", userName);
     List<String> existingNetworkTypes = user.getNetworkType(); // Assuming getNetworkType() returns List<String>
-    List<String> newNetworkTypes = userRequestDTO.getNetworkType();
+    List<String> newNetworkTypes = userRequestDTO.getNetworkType().stream()
+            .map(NetworkTypeDTO::getNetworkTypeName)
+            .collect(Collectors.toList());
 
     // Determine network types to add
     List<String> networkTypesToAdd = new ArrayList<>(newNetworkTypes);
@@ -96,18 +31,52 @@ public ReqRes updateUser(String userName, UserRequestDTO userRequestDTO) {
     // Save updated user
     userDao.save(user);
     logger.info("User updated successfully: {}", userName);
+	
+	
+	
+	
+	
+	
+	private UserDTO mapToUserDTO(User user) {
+    Integer managerId = (user.getManager() != null) ? user.getManager().getUserRid() : null;
 
-    return new ReqRes(200, null, "User updated successfully");
+    // Convert List<String> network types to List<NetworkTypeDTO>
+    List<NetworkTypeDTO> networkTypeDTOs = user.getNetworkType().stream()
+        .map(networkTypeName -> {
+            NetworkTypeDTO dto = new NetworkTypeDTO();
+            dto.setNetworkTypeName(networkTypeName);
+            return dto;
+        })
+        .collect(Collectors.toList());
+
+    UserDTO userDTO = new UserDTO(
+        user.getUserName(),
+        user.getUserFirstName(),
+        user.getUserLastName(),
+        user.getUserPassword(),
+        user.getUserEmail(),
+        user.getUserRid(),
+        managerId
+    );
+    userDTO.setRoles(user.getUserRoles().stream()
+        .map(userRole -> mapToRoleDTO(userRole.getRole()))
+        .collect(Collectors.toList()));
+
+    // Set the network types in the UserDTO
+    userDTO.setNetworkType(networkTypeDTOs);
+
+    return userDTO;
 }
 
 
 
 
 
+  // Handle networkType conversion from List<NetworkTypeDTO> to List<String>
+        List<String> networkTypes = userRequestDTO.getNetworkType().stream()
+            .map(NetworkTypeDTO::getNetworkTypeName)
+            .collect(Collectors.toList());
+        user.setNetworkType(networkTypes);
 
-
-
-
-
- // Add networkType to the UserDTO
-    userDTO.setNetworkType(user.getNetworkType());
+        // Save the user
+        User savedUser = userDao.save(user);
