@@ -44,3 +44,11 @@ public class NetworkTypeDTO {
 			
 			
 			
+			 userDTO.setNetworkType(user.getNetworkType().stream().map(networkTypeName -> {
+        NetworkTypeDTO networkTypeDTO = new NetworkTypeDTO();
+        networkTypeDTO.setNetworkTypeName(networkTypeName);
+        return networkTypeDTO;
+    }).collect(Collectors.toList()));
+			
+			
+			
