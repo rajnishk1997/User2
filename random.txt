@@ -1,31 +1,191 @@
-import javax.persistence.AttributeConverter;
-import javax.persistence.Converter;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
+@Table(name = "user_network_type")
+public class UserNetworkType {
 
-@Converter(autoApply = true)
-public class StringListConverter implements AttributeConverter<List<String>, String> {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Override
-    public String convertToDatabaseColumn(List<String> networkTypes) {
-        if (networkTypes == null) {
-            return null;
-        }
-        return networkTypes.stream().collect(Collectors.joining(","));
-    }
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
 
-    @Override
-    public List<String> convertToEntityAttribute(String dbData) {
-        if (dbData == null || dbData.isEmpty()) {
-            return Arrays.asList(); // Return empty list if null or empty string
-        }
-        return Arrays.asList(dbData.split(","));
-    }
+    @ManyToOne
+    @JoinColumn(name = "network_type_id")
+    private NetworkType networkType;
+
+    // Getters and setters
 }
 
 
 
-  @Column(name = "u_network_type")
-    @Convert(converter = StringListConverter.class)
-    private List<String> networkType;
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserNetworkType> userNetworkTypes = new ArrayList<>();
+
+    // Getters and setters
+
+    public void addNetworkType(NetworkType networkType) {
+        UserNetworkType userNetworkType = new UserNetworkType();
+        userNetworkType.setUser(this);
+        userNetworkType.setNetworkType(networkType);
+        userNetworkTypes.add(userNetworkType);
+    }
+
+    public void removeNetworkType(NetworkType networkType) {
+        userNetworkTypes.removeIf(unt -> unt.getNetworkType().equals(networkType));
+    }
+	
+	
+	public class NetworkTypeDTO {
+    private Long id;
+    private String networkName;
+    // Other fields
+
+    // Getters and setters
+}
+
+public class UserDTO {
+    private Long id;
+    private String userFirstName;
+    private String userLastName;
+    private String userEmail;
+    private List<NetworkTypeDTO> networkTypes;
+    // Other fields
+
+    // Getters and setters
+}
+
+
+
+
+public interface UserDao extends JpaRepository<User, Long> {
+    Optional<User> findByUserName(String userName);
+    // Other query methods
+}
+
+public interface NetworkTypeDao extends JpaRepository<NetworkType, Long> {
+    // Custom query methods if needed
+}
+
+public interface UserNetworkTypeDao extends JpaRepository<UserNetworkType, Long> {
+    // Custom query methods if needed
+}
+
+
+
+
+
+
+
+   for (NetworkTypeDTO networkTypeDTO : userRequestDTO.getNetworkType()) {
+            NetworkType networkType = networkTypeDao.findById(networkTypeDTO.getId())
+                .orElseThrow(() -> new RuntimeException("Network type not found: " + networkTypeDTO.getId()));
+            user.addNetworkType(networkType);
+        }
+
+        User savedUser = userDao.save(user);
+		
+		
+		
+
+    // Update network types
+    logger.info("Updating network types for user: {}", userName);
+    Set<NetworkType> existingNetworkTypes = new HashSet<>(user.getNetworkTypes());
+    Set<NetworkType> newNetworkTypes = new HashSet<>();
+    for (NetworkTypeDTO networkTypeDTO : userRequestDTO.getNetworkType()) {
+        NetworkType networkType = networkTypeDao.findById(networkTypeDTO.getId())
+            .orElseThrow(() -> new RuntimeException("Network type not found: " + networkTypeDTO.getId()));
+        newNetworkTypes.add(networkType);
+    }
+
+    // Determine network types to be removed
+    Set<NetworkType> networkTypesToRemove = new HashSet<>();
+    for (NetworkType existingNetworkType : existingNetworkTypes) {
+        if (!newNetworkTypes.contains(existingNetworkType)) {
+            networkTypesToRemove.add(existingNetworkType);
+            logger.info("Network type marked for removal: {}", existingNetworkType.getNetworkTypeName());
+        }
+    }
+
+    // Remove network types not present in newNetworkTypes
+    logger.info("Removing network types not present in newNetworkTypes for user: {}", userName);
+    user.getNetworkTypes().removeAll(networkTypesToRemove);
+    for (NetworkType networkType : networkTypesToRemove) {
+        networkType.getUsers().remove(user); // Disassociate from network type
+        networkTypeDao.save(networkType); // Update network type in the database
+        logger.info("Removed NetworkType: {}", networkType.getNetworkTypeName());
+    }
+
+    // Add new network types
+    logger.info("Adding new network types for user: {}", userName);
+    for (NetworkType networkType : newNetworkTypes) {
+        if (!user.getNetworkTypes().contains(networkType)) {
+            user.addNetworkType(networkType);
+            networkType.getUsers().add(user); // Associate user with network type
+            networkTypeDao.save(networkType); // Update network type in the database
+            logger.info("Network type added: {}", networkType.getNetworkTypeName());
+        }
+    }
+
+    // Save updated user
+    userDao.save(user);
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	    // Retrieve and set network types
+        Set<NetworkType> networkTypes = new HashSet<>();
+        for (NetworkTypeDTO networkTypeDTO : userRequestDTO.getNetworkType()) {
+            NetworkType networkType = networkTypeDao.findById(networkTypeDTO.getId())
+                .orElseThrow(() -> new RuntimeException("Network type not found: " + networkTypeDTO.getId()));
+            networkTypes.add(networkType);
+        }
+        user.setNetworkTypes(networkTypes);
+
+        // Save the user
+        User savedUser = userDao.save(user);
+
+        // Associate the user with network types
+        for (NetworkType networkType : networkTypes) {
+            networkType.getUsers().add(savedUser);
+            networkTypeDao.save(networkType);
+        }
+
+
+
+
+
+private UserDTO mapToUserDTO(User user) {
+    Integer managerId = (user.getManager() != null) ? user.getManager().getUserRid() : null;
+    UserDTO userDTO = new UserDTO(
+        user.getUserName(),
+        user.getUserFirstName(),
+        user.getUserLastName(),
+        user.getUserPassword(),
+        user.getUserEmail(),
+        user.getUserRid(),
+        managerId
+    );
+
+    userDTO.setRoles(user.getUserRoles().stream()
+        .map(userRole -> mapToRoleDTO(userRole.getRole()))
+        .collect(Collectors.toList()));
+
+    userDTO.setNetworkType(user.getNetworkTypes().stream()
+        .map(this::mapToNetworkTypeDTO)
+        .collect(Collectors.toList()));
+
+    return userDTO;
+}
+
+private NetworkTypeDTO mapToNetworkTypeDTO(NetworkType networkType) {
+    NetworkTypeDTO networkTypeDTO = new NetworkTypeDTO();
+    networkTypeDTO.setId(networkType.getId());
+    networkTypeDTO.setNetworkTypeName(networkType.getNetworkTypeName());
+    // Map other fields as needed
+    return networkTypeDTO;
+}
