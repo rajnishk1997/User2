@@ -1,6 +1,4 @@
-   @Autowired
-    private RXSOTProjectDetailDao projectDetailDao;  // DAO for RXSOTProjectDetail
-
+ 
     public List<User> getAuditorReportees(int managerId) {
         List<User> result = new ArrayList<>();
         fetchAuditorReportees(managerId, result);
@@ -8,15 +6,18 @@
     }
 
     private void fetchAuditorReportees(int managerId, List<User> result) {
+        // Fetch direct reportees of the manager
         List<User> directReportees = userDao.findByManagerId(managerId);
+        
         for (User reportee : directReportees) {
-            if (isAuditor(reportee.getUserName())) {
+            if (isAuditor(reportee)) {
                 result.add(reportee);
+            } else if (isManager(reportee)) {
+                // Recursively fetch reportees of the current manager
                 fetchAuditorReportees(reportee.getUserRid(), result);
             }
         }
     }
-	
 --------------------------------	
 	@Service
 public class ProjectStatusService {
