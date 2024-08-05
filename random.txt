@@ -1,87 +1,64 @@
-UESR:
- @ManyToMany
-    @JoinTable(
-        name = "UserNetworkType",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "network_type_id")
-    )
-    private Set<NetworkType> networkTypes = new HashSet<>();
-	
-	  public void setNetworkTypes(Set<NetworkType> networkTypes) {
-        this.networkTypes = networkTypes;
+   @Autowired
+    private RXSOTProjectDetailDao projectDetailDao;  // DAO for RXSOTProjectDetail
+
+    public List<User> getAuditorReportees(int managerId) {
+        List<User> result = new ArrayList<>();
+        fetchAuditorReportees(managerId, result);
+        return result;
     }
 
-    public Set<NetworkType> getNetworkTypes() {
-        return networkTypes;
+    private void fetchAuditorReportees(int managerId, List<User> result) {
+        List<User> directReportees = userDao.findByManagerId(managerId);
+        for (User reportee : directReportees) {
+            if (isAuditor(reportee.getUserName())) {
+                result.add(reportee);
+                fetchAuditorReportees(reportee.getUserRid(), result);
+            }
+        }
     }
 	
-	NetworkType
-	 @ManyToMany(mappedBy = "networkTypes")
-    private Set<User> users = new HashSet<>();
-	
-	mapToUserDTO:
-	  userDTO.setNetworkType(user.getNetworkTypes().stream()
-        .map(this::mapToNetworkTypeDTO)
-        .collect(Collectors.toList()));
-		
-		private NetworkTypeDTO mapToNetworkTypeDTO(NetworkType networkType) {
-    NetworkTypeDTO networkTypeDTO = new NetworkTypeDTO();
-    networkTypeDTO.setId(networkType.getId());
-    networkTypeDTO.setNetworkTypeName(networkType.getNetworkTypeName());
-    return networkTypeDTO;
+--------------------------------	
+	@Service
+public class ProjectStatusService {
+
+    @Autowired
+    private RXSOTProjectDetailDao projectDetailDao;  // DAO for RXSOTProjectDetail
+
+    public AuditorTotalWorkflowCountDTO getWorkflowCounts(List<User> reportees) {
+        AuditorTotalWorkflowCountDTO dto = new AuditorTotalWorkflowCountDTO();
+        Map<Integer, AuditorReportReponseDTO> reporteeMap = new HashMap<>();
+
+        for (User reportee : reportees) {
+            AuditorReportReponseDTO reportResponse = new AuditorReportReponseDTO();
+            reportResponse.setReporteeName(reportee.getUserName());
+            reportResponse.setManagerName(userDao.findByUserRid(reportee.getManager().getUserRid()).getUserName());
+
+            Map<String, Integer> statusCount = projectDetailDao.countProjectStatuses(reportee.getUserRid());
+            reportResponse.setPending(statusCount.getOrDefault("PENDING", 0));
+            reportResponse.setWip(statusCount.getOrDefault("WIP", 0));
+            reportResponse.setClosed(statusCount.getOrDefault("CLOSED", 0));
+            reportResponse.setSendToBom(statusCount.getOrDefault("SENDTOBOM", 0));
+
+            reporteeMap.put(reportee.getUserRid(), reportResponse);
+        }
+
+        dto.setAuditorReportReponse(new ArrayList<>(reporteeMap.values()));
+        dto.setTotalPending(dto.getAuditorReportReponse().stream().mapToInt(AuditorReportReponseDTO::getPending).sum());
+        dto.setTotalClosed(dto.getAuditorReportReponse().stream().mapToInt(AuditorReportReponseDTO::getClosed).sum());
+        dto.setTotalwip(dto.getAuditorReportReponse().stream().mapToInt(AuditorReportReponseDTO::getWip).sum());
+
+        return dto;
+    }
 }
 
-REGISTER:
- // Map and set network types
-        Set<NetworkType> networkTypes = userRequestDTO.getNetworkType().stream()
-            .map(dto -> networkTypeDao.findById(dto.getId()).orElseThrow(() -> new IllegalArgumentException("NetworkType not found: " + dto.getId())))
-            .collect(Collectors.toSet());
-        user.setNetworkTypes(networkTypes);
+--------------------------------------------------
+  @GetMapping("/report/{managerId}")
+    public ResponseEntity<ResponseWrapper<AuditorTotalWorkflowCountDTO>> getAuditorsReportForManager(@PathVariable int managerId) {
+        List<User> reporteeList = userService.getAuditorReportees(managerId);
+        AuditorTotalWorkflowCountDTO dto = projectStatusService.getWorkflowCounts(reporteeList);
 
-        User savedUser = userDao.save(user);
-		
-		
-		
-		UPDATE:
-		 // Update network types
-    Set<NetworkType> existingNetworkTypes = user.getNetworkTypes();
-    Set<NetworkType> newNetworkTypes = new HashSet<>();
-    for (NetworkTypeDTO networkTypeDTO : userRequestDTO.getNetworkType()) {
-        NetworkType networkType = networkTypeDao.findById(networkTypeDTO.getId()).orElseThrow(() -> {
-            logger.error("NetworkType not found with id: {}", networkTypeDTO.getId());
-            return new RuntimeException("NetworkType not found: " + networkTypeDTO.getId());
-        });
-        newNetworkTypes.add(networkType);
+        ResponseWrapper<AuditorTotalWorkflowCountDTO> responseWrapper = new ResponseWrapper<>(dto);
+        return ResponseEntity.ok(responseWrapper);
     }
-
-    // Determine network types to be removed
-    Set<NetworkType> networkTypesToRemove = new HashSet<>(existingNetworkTypes);
-    networkTypesToRemove.removeAll(newNetworkTypes);
-
-    // Remove network types not present in newNetworkTypes
-    logger.info("Removing network types not present in newNetworkTypes for user: {}", userName);
-    for (NetworkType networkType : networkTypesToRemove) {
-        existingNetworkTypes.remove(networkType);
-        networkType.getUsers().remove(user);
-        networkTypeDao.save(networkType);
-        logger.info("Removed NetworkType: {}", networkType);
-    }
-
-    // Determine network types to be added
-    Set<NetworkType> networkTypesToAdd = new HashSet<>(newNetworkTypes);
-    networkTypesToAdd.removeAll(existingNetworkTypes);
-
-    // Add new network types
-    logger.info("Adding new network types for user: {}", userName);
-    for (NetworkType networkType : networkTypesToAdd) {
-        existingNetworkTypes.add(networkType);
-        networkType.getUsers().add(user);
-        networkTypeDao.save(networkType);
-        logger.info("Added NetworkType: {}", networkType);
-    }
-
-    user.setNetworkTypes(existingNetworkTypes);
-
-    // Save updated user
-    userDao.save(user);
-    logger.info("User updated successfully: {}", userName);
+	
+----------------------------------------------------------
