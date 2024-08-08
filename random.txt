@@ -1,14 +1,3 @@
-@Query("SELECT u FROM User u WHERE u.isNewUser = false AND u.manager.userRid = :managerId " +
-       "AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor') " +
-       "OR u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor')")
-List<User> findAuditorsUnderManagerHierarchy(@Param("managerId") Integer managerId);
-
-@Query("SELECT u FROM User u WHERE u.isNewUser = false AND u.manager.userRid = :managerId " +
-       "AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor') " +
-       "OR u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor')")
-List<User> findImmediateAuditorsUnderManager(@Param("managerId") Integer managerId);
-
-
 @Service
 public class UserService {
 
@@ -16,11 +5,21 @@ public class UserService {
     private UserDao userDao;
 
     public List<User> getUsersByManagerId(Integer managerId, boolean isHierarchy) {
-        if (isHierarchy) {
-            return fetchUsersInHierarchy(managerId);
-        } else {
-            return userDao.findImmediateAuditorsUnderManager(managerId);
+        List<User> users = new ArrayList<>();
+
+        // Fetch the manager itself
+        User manager = userDao.findById(managerId).orElse(null);
+        if (manager != null && hasAuditorRole(manager)) {
+            users.add(manager); // Add manager if it has 'Auditor' role
         }
+
+        if (isHierarchy) {
+            users.addAll(fetchUsersInHierarchy(managerId));
+        } else {
+            users.addAll(userDao.findImmediateAuditorsUnderManager(managerId));
+        }
+
+        return users;
     }
 
     private List<User> fetchUsersInHierarchy(Integer managerId) {
@@ -35,6 +34,7 @@ public class UserService {
             for (User user : immediateUsers) {
                 if (!allAuditors.contains(user)) {
                     allAuditors.add(user);
+                    // Add subordinates to the queue if they have the 'Manager' role
                     if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRoleName()))) {
                         queue.add(user.getUserRid());
                     }
@@ -43,17 +43,8 @@ public class UserService {
         }
         return allAuditors;
     }
-}
 
-
-public List<User> searchUsersWithProjectStatus(List<User> users, String projectStatus) {
-    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-    CriteriaQuery<User> query = cb.createQuery(User.class);
-    Root<User> userRoot = query.from(User.class);
-
-    // Assuming there's a 'projectStatus' field in User entity
-    Predicate predicate = userRoot.get("projectStatus").in(projectStatus);
-    query.select(userRoot).where(cb.and(predicate, userRoot.in(users)));
-
-    return entityManager.createQuery(query).getResultList();
+    private boolean hasAuditorRole(User user) {
+        return user.getUserRoles().stream().anyMatch(role -> "Auditor".equals(role.getRoleName()));
+    }
 }
