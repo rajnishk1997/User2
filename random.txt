@@ -1,50 +1,10 @@
-@Service
-public class UserService {
+@Query("SELECT u FROM User u WHERE u.isNewUser = false AND " +
+       "(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " +
+       "OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
+List<User> findAuditorsUnderManagerHierarchy(@Param("managerId") Integer managerId);
 
-    @Autowired
-    private UserDao userDao;
 
-    public List<User> getUsersByManagerId(Integer managerId, boolean isHierarchy) {
-        List<User> users = new ArrayList<>();
-
-        // Fetch the manager itself
-        User manager = userDao.findById(managerId).orElse(null);
-        if (manager != null && hasAuditorRole(manager)) {
-            users.add(manager); // Add manager if it has 'Auditor' role
-        }
-
-        if (isHierarchy) {
-            users.addAll(fetchUsersInHierarchy(managerId));
-        } else {
-            users.addAll(userDao.findImmediateAuditorsUnderManager(managerId));
-        }
-
-        return users;
-    }
-
-    private List<User> fetchUsersInHierarchy(Integer managerId) {
-        List<User> allAuditors = new ArrayList<>();
-        Queue<Integer> queue = new LinkedList<>();
-        queue.add(managerId);
-
-        while (!queue.isEmpty()) {
-            Integer currentManagerId = queue.poll();
-            List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(currentManagerId);
-
-            for (User user : immediateUsers) {
-                if (!allAuditors.contains(user)) {
-                    allAuditors.add(user);
-                    // Add subordinates to the queue if they have the 'Manager' role
-                    if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRoleName()))) {
-                        queue.add(user.getUserRid());
-                    }
-                }
-            }
-        }
-        return allAuditors;
-    }
-
-    private boolean hasAuditorRole(User user) {
-        return user.getUserRoles().stream().anyMatch(role -> "Auditor".equals(role.getRoleName()));
-    }
-}
+@Query("SELECT u FROM User u WHERE u.isNewUser = false AND " +
+       "(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " +
+       "OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
+List<User> findImmediateAuditorsUnderManager(@Param("managerId") Integer managerId);
