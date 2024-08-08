@@ -1,65 +1,59 @@
- 
-    public List<User> getAuditorReportees(int managerId) {
-        List<User> result = new ArrayList<>();
-        fetchAuditorReportees(managerId, result);
-        return result;
-    }
+@Query("SELECT u FROM User u WHERE u.isNewUser = false AND u.manager.userRid = :managerId " +
+       "AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor') " +
+       "OR u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor')")
+List<User> findAuditorsUnderManagerHierarchy(@Param("managerId") Integer managerId);
 
-    private void fetchAuditorReportees(int managerId, List<User> result) {
-        // Fetch direct reportees of the manager
-        List<User> directReportees = userDao.findByManagerId(managerId);
-        
-        for (User reportee : directReportees) {
-            if (isAuditor(reportee)) {
-                result.add(reportee);
-            } else if (isManager(reportee)) {
-                // Recursively fetch reportees of the current manager
-                fetchAuditorReportees(reportee.getUserRid(), result);
-            }
-        }
-    }
---------------------------------	
-	@Service
-public class ProjectStatusService {
+@Query("SELECT u FROM User u WHERE u.isNewUser = false AND u.manager.userRid = :managerId " +
+       "AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor') " +
+       "OR u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles r WHERE r.roleName = 'Auditor')")
+List<User> findImmediateAuditorsUnderManager(@Param("managerId") Integer managerId);
+
+
+@Service
+public class UserService {
 
     @Autowired
-    private RXSOTProjectDetailDao projectDetailDao;  // DAO for RXSOTProjectDetail
+    private UserDao userDao;
 
-    public AuditorTotalWorkflowCountDTO getWorkflowCounts(List<User> reportees) {
-        AuditorTotalWorkflowCountDTO dto = new AuditorTotalWorkflowCountDTO();
-        Map<Integer, AuditorReportReponseDTO> reporteeMap = new HashMap<>();
-
-        for (User reportee : reportees) {
-            AuditorReportReponseDTO reportResponse = new AuditorReportReponseDTO();
-            reportResponse.setReporteeName(reportee.getUserName());
-            reportResponse.setManagerName(userDao.findByUserRid(reportee.getManager().getUserRid()).getUserName());
-
-            Map<String, Integer> statusCount = projectDetailDao.countProjectStatuses(reportee.getUserRid());
-            reportResponse.setPending(statusCount.getOrDefault("PENDING", 0));
-            reportResponse.setWip(statusCount.getOrDefault("WIP", 0));
-            reportResponse.setClosed(statusCount.getOrDefault("CLOSED", 0));
-            reportResponse.setSendToBom(statusCount.getOrDefault("SENDTOBOM", 0));
-
-            reporteeMap.put(reportee.getUserRid(), reportResponse);
+    public List<User> getUsersByManagerId(Integer managerId, boolean isHierarchy) {
+        if (isHierarchy) {
+            return fetchUsersInHierarchy(managerId);
+        } else {
+            return userDao.findImmediateAuditorsUnderManager(managerId);
         }
+    }
 
-        dto.setAuditorReportReponse(new ArrayList<>(reporteeMap.values()));
-        dto.setTotalPending(dto.getAuditorReportReponse().stream().mapToInt(AuditorReportReponseDTO::getPending).sum());
-        dto.setTotalClosed(dto.getAuditorReportReponse().stream().mapToInt(AuditorReportReponseDTO::getClosed).sum());
-        dto.setTotalwip(dto.getAuditorReportReponse().stream().mapToInt(AuditorReportReponseDTO::getWip).sum());
+    private List<User> fetchUsersInHierarchy(Integer managerId) {
+        List<User> allAuditors = new ArrayList<>();
+        Queue<Integer> queue = new LinkedList<>();
+        queue.add(managerId);
 
-        return dto;
+        while (!queue.isEmpty()) {
+            Integer currentManagerId = queue.poll();
+            List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(currentManagerId);
+
+            for (User user : immediateUsers) {
+                if (!allAuditors.contains(user)) {
+                    allAuditors.add(user);
+                    if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRoleName()))) {
+                        queue.add(user.getUserRid());
+                    }
+                }
+            }
+        }
+        return allAuditors;
     }
 }
 
---------------------------------------------------
-  @GetMapping("/report/{managerId}")
-    public ResponseEntity<ResponseWrapper<AuditorTotalWorkflowCountDTO>> getAuditorsReportForManager(@PathVariable int managerId) {
-        List<User> reporteeList = userService.getAuditorReportees(managerId);
-        AuditorTotalWorkflowCountDTO dto = projectStatusService.getWorkflowCounts(reporteeList);
 
-        ResponseWrapper<AuditorTotalWorkflowCountDTO> responseWrapper = new ResponseWrapper<>(dto);
-        return ResponseEntity.ok(responseWrapper);
-    }
-	
-----------------------------------------------------------
+public List<User> searchUsersWithProjectStatus(List<User> users, String projectStatus) {
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+    CriteriaQuery<User> query = cb.createQuery(User.class);
+    Root<User> userRoot = query.from(User.class);
+
+    // Assuming there's a 'projectStatus' field in User entity
+    Predicate predicate = userRoot.get("projectStatus").in(projectStatus);
+    query.select(userRoot).where(cb.and(predicate, userRoot.in(users)));
+
+    return entityManager.createQuery(query).getResultList();
+}
