@@ -4,30 +4,26 @@ public class UserService {
     @Autowired
     private UserDao userDao;
 
-    public List<Integer> getUserIdsByManagerId(Integer managerId, boolean isHierarchy) {
-        List<Integer> userIds = new ArrayList<>();
+    public Set<User> getUsersByManagerId(Integer managerId, boolean isHierarchy) {
+        Set<User> users = new HashSet<>(); // Use a Set to track unique User objects
 
-        // Fetch the manager itself
+        // Fetch the manager itself and add to the set if they have the 'Auditor' role
         User manager = userDao.findById(managerId).orElse(null);
         if (manager != null && hasAuditorRole(manager)) {
-            userIds.add(manager.getUserRid()); // Add manager's userId if it has 'Auditor' role
+            users.add(manager); // Add manager if they are an Auditor
         }
 
-        List<User> users;
         if (isHierarchy) {
-            users = fetchUsersInHierarchy(managerId);
+            fetchUsersInHierarchy(managerId, users); // Pass the Set to avoid duplicates
         } else {
-            users = userDao.findImmediateAuditorsUnderManager(managerId);
+            List<User> immediateUsers = userDao.findImmediateAuditorsUnderManager(managerId);
+            users.addAll(immediateUsers); // Add all immediate users who are auditors
         }
 
-        // Add the userIds of the fetched users to the list
-        userIds.addAll(users.stream().map(User::getUserRid).collect(Collectors.toList()));
-
-        return userIds;
+        return users; // Return the Set of User objects
     }
 
-    private List<User> fetchUsersInHierarchy(Integer managerId) {
-        List<User> allAuditors = new ArrayList<>();
+    private void fetchUsersInHierarchy(Integer managerId, Set<User> users) {
         Queue<Integer> queue = new LinkedList<>();
         queue.add(managerId);
 
@@ -36,34 +32,16 @@ public class UserService {
             List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(currentManagerId);
 
             for (User user : immediateUsers) {
-                if (!allAuditors.contains(user)) {
-                    allAuditors.add(user);
-                    if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRoleName()))) {
+                if (users.add(user)) { // Add the User object to the set (Set ensures uniqueness)
+                    if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
                         queue.add(user.getUserRid());
                     }
                 }
             }
         }
-        return allAuditors;
     }
 
     private boolean hasAuditorRole(User user) {
-        return user.getUserRoles().stream().anyMatch(role -> "Auditor".equals(role.getRoleName()));
+        return user.getUserRoles().stream().anyMatch(role -> "Auditor".equals(role.getRole().getRoleName()));
     }
 }
-
-
-
-
-
-@Query("SELECT u.userRid FROM User u WHERE u.isNewUser = false AND " +
-       "(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " +
-       "OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
-List<Integer> findAuditorUserIdsUnderManagerHierarchy(@Param("managerId") Integer managerId);
-
-
-
-@Query("SELECT u.userRid FROM User u WHERE u.isNewUser = false AND " +
-       "(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " +
-       "OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
-List<Integer> findImmediateAuditorUserIdsUnderManager(@Param("managerId") Integer managerId);
