@@ -1,47 +1,72 @@
-@Service
-public class UserService {
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-    @Autowired
-    private UserDao userDao;
+public ReqRes<ValidateJsonDTO> refactorSotGppDashboardResults(String jsonString) {
+    ReqRes<ValidateJsonDTO> response = new ReqRes<>();
+    ValidateJsonDTO validateJsonDTO = new ValidateJsonDTO();
 
-    public Set<User> getUsersByManagerId(Integer managerId, boolean isHierarchy) {
-        Set<User> users = new HashSet<>(); // Use a Set to track unique User objects
+    try {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(jsonString);
 
-        // Fetch the manager itself and add to the set if they have the 'Auditor' role
-        User manager = userDao.findById(managerId).orElse(null);
-        if (manager != null && hasAuditorRole(manager)) {
-            users.add(manager); // Add manager if they are an Auditor
+        // Extract and set the fields if they exist in jsonString
+        if (jsonNode.has("gppJson4Matched")) {
+            validateJsonDTO.setGppJson4Matched(jsonNode.get("gppJson4Matched").asInt());
+        }
+        if (jsonNode.has("gppJson4NotMatched")) {
+            validateJsonDTO.setGppJson4NotMatched(jsonNode.get("gppJson4NotMatched").asInt());
+        }
+        if (jsonNode.has("gppJson4Null")) {
+            validateJsonDTO.setGppJson4Null(jsonNode.get("gppJson4Null").asInt());
+        }
+        if (jsonNode.has("gppJson4ReValidated")) {
+            validateJsonDTO.setGppJson4ReValidated(jsonNode.get("gppJson4ReValidated").asInt());
+        }
+        if (jsonNode.has("gppJson4NotValidated")) {
+            validateJsonDTO.setGppJson4NotValidated(jsonNode.get("gppJson4NotValidated").asInt());
         }
 
-        if (isHierarchy) {
-            fetchUsersInHierarchy(managerId, users); // Pass the Set to avoid duplicates
-        } else {
-            List<User> immediateUsers = userDao.findImmediateAuditorsUnderManager(managerId);
-            users.addAll(immediateUsers); // Add all immediate users who are auditors
+        if (jsonNode.has("gppJson10Matched")) {
+            validateJsonDTO.setGppJson10Matched(jsonNode.get("gppJson10Matched").asInt());
+        }
+        if (jsonNode.has("gppJson10NotMatched")) {
+            validateJsonDTO.setGppJson10NotMatched(jsonNode.get("gppJson10NotMatched").asInt());
+        }
+        if (jsonNode.has("gppJson10Null")) {
+            validateJsonDTO.setGppJson10Null(jsonNode.get("gppJson10Null").asInt());
+        }
+        if (jsonNode.has("gppJson10Message")) {
+            validateJsonDTO.setGppJson10Message(jsonNode.get("gppJson10Message").asText());
         }
 
-        return users; // Return the Set of User objects
-    }
-
-    private void fetchUsersInHierarchy(Integer managerId, Set<User> users) {
-        Queue<Integer> queue = new LinkedList<>();
-        queue.add(managerId);
-
-        while (!queue.isEmpty()) {
-            Integer currentManagerId = queue.poll();
-            List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(currentManagerId);
-
-            for (User user : immediateUsers) {
-                if (users.add(user)) { // Add the User object to the set (Set ensures uniqueness)
-                    if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
-                        queue.add(user.getUserRid());
-                    }
-                }
-            }
+        if (jsonNode.has("gppJson28Matched")) {
+            validateJsonDTO.setGppJson28Matched(jsonNode.get("gppJson28Matched").asInt());
         }
+        if (jsonNode.has("gppJson28NotMatched")) {
+            validateJsonDTO.setGppJson28NotMatched(jsonNode.get("gppJson28NotMatched").asInt());
+        }
+        if (jsonNode.has("gppJson28Null")) {
+            validateJsonDTO.setGppJson28Null(jsonNode.get("gppJson28Null").asInt());
+        }
+        if (jsonNode.has("gppJson10MessageifCTRXnotFound")) {
+            validateJsonDTO.setGppJson10MessageifCTRXnotFound(jsonNode.get("gppJson10MessageifCTRXnotFound").asText());
+        }
+        if (jsonNode.has("gppJson28Message")) {
+            validateJsonDTO.setGppJson28Message(jsonNode.get("gppJson28Message").asText());
+        }
+
+        // Set response object
+        response.setStatusCode(200);
+        response.setError(null);
+        response.setMessage("Successfully processed the JSON data.");
+        response.setData(validateJsonDTO);
+
+    } catch (Exception e) {
+        response.setStatusCode(500);
+        response.setError("Error processing JSON data");
+        response.setMessage(e.getMessage());
+        response.setData(null);
     }
 
-    private boolean hasAuditorRole(User user) {
-        return user.getUserRoles().stream().anyMatch(role -> "Auditor".equals(role.getRole().getRoleName()));
-    }
+    return response;
 }
