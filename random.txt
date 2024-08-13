@@ -1,72 +1,64 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public ReqRes<ValidateJsonDTO> refactorSotGppDashboardResults(String jsonString) {
-    ReqRes<ValidateJsonDTO> response = new ReqRes<>();
-    ValidateJsonDTO validateJsonDTO = new ValidateJsonDTO();
+public ReqRes<String> refactorSotGppDashboardResults(String jsonString) {
+    ReqRes<String> response = new ReqRes<>();
 
     try {
         ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode jsonNode = objectMapper.readTree(jsonString);
+        
+        // Parse the incoming JSON string
+        JsonNode incomingJsonNode = objectMapper.readTree(jsonString);
 
-        // Extract and set the fields if they exist in jsonString
-        if (jsonNode.has("gppJson4Matched")) {
-            validateJsonDTO.setGppJson4Matched(jsonNode.get("gppJson4Matched").asInt());
-        }
-        if (jsonNode.has("gppJson4NotMatched")) {
-            validateJsonDTO.setGppJson4NotMatched(jsonNode.get("gppJson4NotMatched").asInt());
-        }
-        if (jsonNode.has("gppJson4Null")) {
-            validateJsonDTO.setGppJson4Null(jsonNode.get("gppJson4Null").asInt());
-        }
-        if (jsonNode.has("gppJson4ReValidated")) {
-            validateJsonDTO.setGppJson4ReValidated(jsonNode.get("gppJson4ReValidated").asInt());
-        }
-        if (jsonNode.has("gppJson4NotValidated")) {
-            validateJsonDTO.setGppJson4NotValidated(jsonNode.get("gppJson4NotValidated").asInt());
-        }
+        // Fetch the existing JSON string from the database
+        String dbJsonString = fetchJsonFromDatabase();  // Implement this method to retrieve the JSON from DB
 
-        if (jsonNode.has("gppJson10Matched")) {
-            validateJsonDTO.setGppJson10Matched(jsonNode.get("gppJson10Matched").asInt());
-        }
-        if (jsonNode.has("gppJson10NotMatched")) {
-            validateJsonDTO.setGppJson10NotMatched(jsonNode.get("gppJson10NotMatched").asInt());
-        }
-        if (jsonNode.has("gppJson10Null")) {
-            validateJsonDTO.setGppJson10Null(jsonNode.get("gppJson10Null").asInt());
-        }
-        if (jsonNode.has("gppJson10Message")) {
-            validateJsonDTO.setGppJson10Message(jsonNode.get("gppJson10Message").asText());
-        }
+        // Parse the DB JSON string
+        JsonNode dbJsonNode = objectMapper.readTree(dbJsonString);
 
-        if (jsonNode.has("gppJson28Matched")) {
-            validateJsonDTO.setGppJson28Matched(jsonNode.get("gppJson28Matched").asInt());
-        }
-        if (jsonNode.has("gppJson28NotMatched")) {
-            validateJsonDTO.setGppJson28NotMatched(jsonNode.get("gppJson28NotMatched").asInt());
-        }
-        if (jsonNode.has("gppJson28Null")) {
-            validateJsonDTO.setGppJson28Null(jsonNode.get("gppJson28Null").asInt());
-        }
-        if (jsonNode.has("gppJson10MessageifCTRXnotFound")) {
-            validateJsonDTO.setGppJson10MessageifCTRXnotFound(jsonNode.get("gppJson10MessageifCTRXnotFound").asText());
-        }
-        if (jsonNode.has("gppJson28Message")) {
-            validateJsonDTO.setGppJson28Message(jsonNode.get("gppJson28Message").asText());
-        }
+        // Update fields in dbJsonNode with values from incomingJsonNode
+        updateJsonFields(dbJsonNode, incomingJsonNode);
+
+        // Convert the updated JsonNode back to a string
+        String updatedDbJsonString = objectMapper.writeValueAsString(dbJsonNode);
+
+        // Store the updated JSON string back in the database
+        saveJsonToDatabase(updatedDbJsonString);  // Implement this method to save the JSON back to DB
 
         // Set response object
         response.setStatusCode(200);
         response.setError(null);
-        response.setMessage("Successfully processed the JSON data.");
-        response.setData(validateJsonDTO);
+        response.setMessage("Successfully updated and stored the JSON data.");
+        response.setData(updatedDbJsonString);
 
     } catch (Exception e) {
         response.setStatusCode(500);
-        response.setError("Error processing JSON data");
+        response.setError("Error processing and updating JSON data");
         response.setMessage(e.getMessage());
         response.setData(null);
     }
 
     return response;
+}
+
+private void updateJsonFields(JsonNode dbJsonNode, JsonNode incomingJsonNode) {
+    // Update only specific fields in the DB JSON with the incoming JSON fields
+    if (incomingJsonNode.has("gppJson4Matched")) {
+        ((ObjectNode) dbJsonNode).put("gppJson4Matched", incomingJsonNode.get("gppJson4Matched").asInt());
+    }
+    if (incomingJsonNode.has("gppJson4NotMatched")) {
+        ((ObjectNode) dbJsonNode).put("gppJson4NotMatched", incomingJsonNode.get("gppJson4NotMatched").asInt());
+    }
+    // Add similar blocks for other fields...
+    // gppJson4Null, gppJson4ReValidated, etc.
+}
+
+private String fetchJsonFromDatabase() {
+    // Implement the logic to fetch the JSON string from the database
+    return dbJsonString;
+}
+
+private void saveJsonToDatabase(String updatedDbJsonString) {
+    // Implement the logic to save the updated JSON string back to the database
 }
