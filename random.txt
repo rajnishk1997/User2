@@ -1,64 +1,82 @@
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+@RestController
+@RequestMapping("/api/projects")
+public class RXSOTProjectDetailController {
 
-public ReqRes<String> refactorSotGppDashboardResults(String jsonString) {
-    ReqRes<String> response = new ReqRes<>();
+    @Autowired
+    private RXSOTProjectDetailService projectDetailService;
 
-    try {
-        ObjectMapper objectMapper = new ObjectMapper();
-        
-        // Parse the incoming JSON string
-        JsonNode incomingJsonNode = objectMapper.readTree(jsonString);
-
-        // Fetch the existing JSON string from the database
-        String dbJsonString = fetchJsonFromDatabase();  // Implement this method to retrieve the JSON from DB
-
-        // Parse the DB JSON string
-        JsonNode dbJsonNode = objectMapper.readTree(dbJsonString);
-
-        // Update fields in dbJsonNode with values from incomingJsonNode
-        updateJsonFields(dbJsonNode, incomingJsonNode);
-
-        // Convert the updated JsonNode back to a string
-        String updatedDbJsonString = objectMapper.writeValueAsString(dbJsonNode);
-
-        // Store the updated JSON string back in the database
-        saveJsonToDatabase(updatedDbJsonString);  // Implement this method to save the JSON back to DB
-
-        // Set response object
-        response.setStatusCode(200);
-        response.setError(null);
-        response.setMessage("Successfully updated and stored the JSON data.");
-        response.setData(updatedDbJsonString);
-
-    } catch (Exception e) {
-        response.setStatusCode(500);
-        response.setError("Error processing and updating JSON data");
-        response.setMessage(e.getMessage());
-        response.setData(null);
+    @PostMapping("/search")
+    public ResponseEntity<List<RXSOTProjectDetail>> searchProjects(@RequestBody RXSOTProjectDetailSearchDTO searchDTO) {
+        try {
+            List<RXSOTProjectDetail> projectDetails = projectDetailService.searchProjects(searchDTO);
+            return new ResponseEntity<>(projectDetails, HttpStatus.OK);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An error occurred while searching for project details", ex);
+        }
     }
-
-    return response;
 }
 
-private void updateJsonFields(JsonNode dbJsonNode, JsonNode incomingJsonNode) {
-    // Update only specific fields in the DB JSON with the incoming JSON fields
-    if (incomingJsonNode.has("gppJson4Matched")) {
-        ((ObjectNode) dbJsonNode).put("gppJson4Matched", incomingJsonNode.get("gppJson4Matched").asInt());
+@Service
+public class RXSOTProjectDetailService {
+
+    @Autowired
+    private RXSOTProjectDetailRepository projectDetailRepository;
+
+    public List<RXSOTProjectDetail> searchProjects(RXSOTProjectDetailSearchDTO searchDTO) {
+        if (isSearchCriteriaEmpty(searchDTO)) {
+            // If no search criteria, return all results sorted by createdDate descending
+            return projectDetailRepository.findAll(Sort.by(Sort.Direction.DESC, "createdDate"));
+        } else {
+            // Use the Specification to filter results
+            Specification<RXSOTProjectDetail> spec = RXSOTProjectDetailSpecification.buildSpecification(searchDTO);
+            return projectDetailRepository.findAll(spec);
+        }
     }
-    if (incomingJsonNode.has("gppJson4NotMatched")) {
-        ((ObjectNode) dbJsonNode).put("gppJson4NotMatched", incomingJsonNode.get("gppJson4NotMatched").asInt());
+
+    private boolean isSearchCriteriaEmpty(RXSOTProjectDetailSearchDTO searchDTO) {
+        return searchDTO.getFromDate() == null &&
+               searchDTO.getToDate() == null &&
+               (searchDTO.getByUser() == null || searchDTO.getByUser().isEmpty()) &&
+               (searchDTO.getByClient() == null || searchDTO.getByClient().isEmpty()) &&
+               searchDTO.getLoggedInUserId() == null &&
+               (searchDTO.getProjectCode() == null || searchDTO.getProjectCode().isEmpty()) &&
+               (searchDTO.getProjectStatus() == null || searchDTO.getProjectStatus().isEmpty()) &&
+               (searchDTO.getIsHierarchy() == null || searchDTO.getIsHierarchy().isEmpty());
     }
-    // Add similar blocks for other fields...
-    // gppJson4Null, gppJson4ReValidated, etc.
 }
 
-private String fetchJsonFromDatabase() {
-    // Implement the logic to fetch the JSON string from the database
-    return dbJsonString;
-}
+public class RXSOTProjectDetailSpecification {
 
-private void saveJsonToDatabase(String updatedDbJsonString) {
-    // Implement the logic to save the updated JSON string back to the database
+    public static Specification<RXSOTProjectDetail> buildSpecification(RXSOTProjectDetailSearchDTO searchDTO) {
+        return (Root<RXSOTProjectDetail> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
+            Predicate predicate = criteriaBuilder.conjunction();
+            
+            if (searchDTO.getFromDate() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.greaterThanOrEqualTo(root.get("createdDate"), searchDTO.getFromDate()));
+            }
+            if (searchDTO.getToDate() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.lessThanOrEqualTo(root.get("createdDate"), searchDTO.getToDate()));
+            }
+            if (searchDTO.getByUser() != null && !searchDTO.getByUser().isEmpty()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("byUser"), searchDTO.getByUser()));
+            }
+            if (searchDTO.getByClient() != null && !searchDTO.getByClient().isEmpty()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("byClient"), searchDTO.getByClient()));
+            }
+            if (searchDTO.getLoggedInUserId() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("loggedInUserId"), searchDTO.getLoggedInUserId()));
+            }
+            if (searchDTO.getProjectCode() != null && !searchDTO.getProjectCode().isEmpty()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("projectCode"), searchDTO.getProjectCode()));
+            }
+            if (searchDTO.getProjectStatus() != null && !searchDTO.getProjectStatus().isEmpty()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("projectStatus"), searchDTO.getProjectStatus()));
+            }
+            if (searchDTO.getIsHierarchy() != null && !searchDTO.getIsHierarchy().isEmpty()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("isHierarchy"), searchDTO.getIsHierarchy()));
+            }
+            
+            return predicate;
+        };
+    }
 }
