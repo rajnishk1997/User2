@@ -1,20 +1,13 @@
-@RestController
-@RequestMapping("/api/projects")
-public class RXSOTProjectDetailController {
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
 
-    @Autowired
-    private RXSOTProjectDetailService projectDetailService;
-
-    @PostMapping("/search")
-    public ResponseEntity<List<RXSOTProjectDetail>> searchProjects(@RequestBody RXSOTProjectDetailSearchDTO searchDTO) {
-        try {
-            List<RXSOTProjectDetail> projectDetails = projectDetailService.searchProjects(searchDTO);
-            return new ResponseEntity<>(projectDetails, HttpStatus.OK);
-        } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An error occurred while searching for project details", ex);
-        }
-    }
-}
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import java.util.List;
 
 @Service
 public class RXSOTProjectDetailService {
@@ -28,7 +21,7 @@ public class RXSOTProjectDetailService {
             return projectDetailRepository.findAll(Sort.by(Sort.Direction.DESC, "createdDate"));
         } else {
             // Use the Specification to filter results
-            Specification<RXSOTProjectDetail> spec = RXSOTProjectDetailSpecification.buildSpecification(searchDTO);
+            Specification<RXSOTProjectDetail> spec = buildSpecification(searchDTO);
             return projectDetailRepository.findAll(spec);
         }
     }
@@ -43,11 +36,8 @@ public class RXSOTProjectDetailService {
                (searchDTO.getProjectStatus() == null || searchDTO.getProjectStatus().isEmpty()) &&
                (searchDTO.getIsHierarchy() == null || searchDTO.getIsHierarchy().isEmpty());
     }
-}
 
-public class RXSOTProjectDetailSpecification {
-
-    public static Specification<RXSOTProjectDetail> buildSpecification(RXSOTProjectDetailSearchDTO searchDTO) {
+    private Specification<RXSOTProjectDetail> buildSpecification(RXSOTProjectDetailSearchDTO searchDTO) {
         return (Root<RXSOTProjectDetail> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
             Predicate predicate = criteriaBuilder.conjunction();
             
