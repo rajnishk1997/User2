@@ -1,7 +1,6 @@
-  @Query("SELECT CONCAT(m.userFirstName, ' ', COALESCE(m.userMiddleName, ''), ' ', m.userLastName) " +
-           "FROM User u JOIN u.manager m WHERE u.userRid = :userRid")
-    String findManagerFullNameByUserRid(@Param("userRid") int userRid);
-	
-	
-	 @Query("SELECT u.manager.userRid FROM User u WHERE u.userRid = :userId")
-    Integer findManagerIdByUserId(@Param("userId") int userId);
+  @Query("SELECT new com.example.dto.RXSOTProjectDetailDTO(p.id, CONCAT(m.userFirstName, ' ', COALESCE(m.userMiddleName, ''), ' ', COALESCE(m.userLastName, ''))) " +
+           "FROM RXSOTProjectDetails p " +
+           "JOIN User m ON p.managerRid = m.userRid " +
+           "WHERE p.id = :projectId")
+    RXSOTProjectDetailDTO findProjectDetailWithManagerName(@Param("projectId") int projectId);
+}
