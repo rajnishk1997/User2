@@ -1,33 +1,7 @@
- // Step 1: Capture the start time
-        LocalDateTime startTime = LocalDateTime.now();
-
-        // Simulate some processing or operation
-        try {
-            Thread.sleep(5400000); // Simulating delay (1 hour 30 minutes)
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        // Step 2: Capture the end time
-        LocalDateTime endTime = LocalDateTime.now();
-
-        // Step 3: Calculate the duration between start and end time
-        Duration duration = Duration.between(startTime, endTime);
-
-        // Step 4: Format the duration as HH:mm
-        String formattedDuration = formatDuration(duration);
-
-        // Assign values to entity
-        entity.setStartDateTime(startTime);
-        entity.setEndDatetime(endTime);
-        entity.setDurationString(formattedDuration); // Store as string
-
-        // Save entity to database (assuming a repository is available)
-        // myEntityRepository.save(entity);
-    }
-
-    private String formatDuration(Duration duration) {
-        long hours = duration.toHours();
-        long minutes = duration.toMinutes() % 60;
-        return String.format("%02d:%02d", hours, minutes);
-    }
+  @Query("SELECT CONCAT(m.userFirstName, ' ', COALESCE(m.userMiddleName, ''), ' ', m.userLastName) " +
+           "FROM User u JOIN u.manager m WHERE u.userRid = :userRid")
+    String findManagerFullNameByUserRid(@Param("userRid") int userRid);
+	
+	
+	 @Query("SELECT u.manager.userRid FROM User u WHERE u.userRid = :userId")
+    Integer findManagerIdByUserId(@Param("userId") int userId);
