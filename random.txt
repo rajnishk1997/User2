@@ -1,6 +1,42 @@
-  @Query("SELECT new com.example.dto.RXSOTProjectDetailDTO(p.id, CONCAT(m.userFirstName, ' ', COALESCE(m.userMiddleName, ''), ' ', COALESCE(m.userLastName, ''))) " +
-           "FROM RXSOTProjectDetails p " +
-           "JOIN User m ON p.managerRid = m.userRid " +
-           "WHERE p.id = :projectId")
-    RXSOTProjectDetailDTO findProjectDetailWithManagerName(@Param("projectId") int projectId);
+public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
+
+    @Query("SELECT p FROM ProjectEventDetails p WHERE p.projectNo = :projectNo")
+    List<ProjectEventDetails> findByProjectNo(@Param("projectNo") String projectNo);
+}
+
+@Service
+public class ProjectEventDetailsService {
+
+    @Autowired
+    private ProjectEventDetailsRepository repository;
+
+    public List<ProjectEventDetails> getByProjectNo(String projectNo) {
+        return repository.findByProjectNo(projectNo);
+    }
+}
+
+ @Autowired
+    private ProjectEventDetailsService service;
+
+    @GetMapping("/projectNo/{projectNo}")
+    public ResponseEntity<?> getProjectEventDetailsByProjectNo(@PathVariable String projectNo) {
+        try {
+            List<ProjectEventDetails> projectEventDetails = service.getByProjectNo(projectNo);
+            
+            if (projectEventDetails.isEmpty()) {
+                throw new ResourceNotFoundException("No events found for project number: " + projectNo);
+            }
+            
+            return ResponseEntity.ok(projectEventDetails);
+        } catch (ResourceNotFoundException ex) {
+            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+        } catch (Exception ex) {
+            return new ResponseEntity<>("An unexpected error occurred: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+	
+	public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
 }
