@@ -1,42 +1,18 @@
-public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
-
-    @Query("SELECT p FROM ProjectEventDetails p WHERE p.projectNo = :projectNo")
-    List<ProjectEventDetails> findByProjectNo(@Param("projectNo") String projectNo);
-}
-
-@Service
-public class ProjectEventDetailsService {
-
-    @Autowired
-    private ProjectEventDetailsRepository repository;
-
-    public List<ProjectEventDetails> getByProjectNo(String projectNo) {
-        return repository.findByProjectNo(projectNo);
-    }
-}
-
- @Autowired
-    private ProjectEventDetailsService service;
-
-    @GetMapping("/projectNo/{projectNo}")
-    public ResponseEntity<?> getProjectEventDetailsByProjectNo(@PathVariable String projectNo) {
-        try {
+ try {
             List<ProjectEventDetails> projectEventDetails = service.getByProjectNo(projectNo);
             
             if (projectEventDetails.isEmpty()) {
-                throw new ResourceNotFoundException("No events found for project number: " + projectNo);
+                ReqRes reqRes = new ReqRes(404, "Not Found", "No events found for project number: " + projectNo);
+                ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(null, reqRes);
+                return new ResponseEntity<>(responseWrapper, HttpStatus.NOT_FOUND);
             }
             
-            return ResponseEntity.ok(projectEventDetails);
-        } catch (ResourceNotFoundException ex) {
-            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+            ReqRes reqRes = new ReqRes(200, null, "Success");
+            ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(projectEventDetails, reqRes);
+            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
         } catch (Exception ex) {
-            return new ResponseEntity<>("An unexpected error occurred: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            ReqRes reqRes = new ReqRes(500, ex.getMessage(), "An unexpected error occurred.");
+            ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(null, reqRes);
+            return new ResponseEntity<>(responseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-	
-	public class ResourceNotFoundException extends RuntimeException {
-    public ResourceNotFoundException(String message) {
-        super(message);
-    }
-}
