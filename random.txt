@@ -1,18 +1,38 @@
- try {
-            List<ProjectEventDetails> projectEventDetails = service.getByProjectNo(projectNo);
-            
-            if (projectEventDetails.isEmpty()) {
-                ReqRes reqRes = new ReqRes(404, "Not Found", "No events found for project number: " + projectNo);
-                ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(null, reqRes);
-                return new ResponseEntity<>(responseWrapper, HttpStatus.NOT_FOUND);
+@Service
+public class ProjectSOTService {
+
+    @Autowired
+    private ProjectSOTRepository projectSOTRepository;
+
+    public ResponseWrapper<List<Object>> fetchValResultNtwk(Long id, int switchCase) {
+        try {
+            String validatedJsonDT4 = projectSOTRepository.findValidatedJsonDT4ById(id);
+
+            if (validatedJsonDT4 == null || validatedJsonDT4.isEmpty()) {
+                throw new CustomNotFoundException("validatedJsonDT4 is empty or null for the provided ID");
             }
-            
-            ReqRes reqRes = new ReqRes(200, null, "Success");
-            ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(projectEventDetails, reqRes);
-            return new ResponseEntity<>(responseWrapper, HttpStatus.OK);
-        } catch (Exception ex) {
-            ReqRes reqRes = new ReqRes(500, ex.getMessage(), "An unexpected error occurred.");
-            ResponseWrapper<List<ProjectEventDetails>> responseWrapper = new ResponseWrapper<>(null, reqRes);
-            return new ResponseEntity<>(responseWrapper, HttpStatus.INTERNAL_SERVER_ERROR);
+
+            // Parse JSON
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(validatedJsonDT4);
+
+            // Handle switch cases
+            switch (switchCase) {
+                case 1:
+                    if (rootNode.has("val_result_ntwk")) {
+                        List<Object> valResultNtwk = objectMapper.convertValue(rootNode.get("val_result_ntwk"), new TypeReference<List<Object>>() {});
+                        return new ResponseWrapper<>(valResultNtwk, "Success");
+                    } else {
+                        throw new CustomNotFoundException("val_result_ntwk does not exist in the JSON data");
+                    }
+                // Add more cases as needed
+                default:
+                    throw new IllegalArgumentException("Invalid switch case");
+            }
+        } catch (JsonProcessingException e) {
+            throw new CustomBadRequestException("Error parsing JSON data", e);
+        } catch (Exception e) {
+            throw new CustomInternalServerErrorException("An unexpected error occurred", e);
         }
     }
+}
