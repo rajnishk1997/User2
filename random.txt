@@ -1,38 +1,69 @@
-@Service
-public class ProjectSOTService {
+public class NotesDTO {
+    private Map<String, String> notes;
 
-    @Autowired
-    private ProjectSOTRepository projectSOTRepository;
+    // Constructor, Getters and Setters
+    public NotesDTO(Map<String, String> notes) {
+        this.notes = notes;
+    }
 
-    public ResponseWrapper<List<Object>> fetchValResultNtwk(Long id, int switchCase) {
-        try {
-            String validatedJsonDT4 = projectSOTRepository.findValidatedJsonDT4ById(id);
+    public Map<String, String> getNotes() {
+        return notes;
+    }
 
-            if (validatedJsonDT4 == null || validatedJsonDT4.isEmpty()) {
-                throw new CustomNotFoundException("validatedJsonDT4 is empty or null for the provided ID");
-            }
-
-            // Parse JSON
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.readTree(validatedJsonDT4);
-
-            // Handle switch cases
-            switch (switchCase) {
-                case 1:
-                    if (rootNode.has("val_result_ntwk")) {
-                        List<Object> valResultNtwk = objectMapper.convertValue(rootNode.get("val_result_ntwk"), new TypeReference<List<Object>>() {});
-                        return new ResponseWrapper<>(valResultNtwk, "Success");
-                    } else {
-                        throw new CustomNotFoundException("val_result_ntwk does not exist in the JSON data");
-                    }
-                // Add more cases as needed
-                default:
-                    throw new IllegalArgumentException("Invalid switch case");
-            }
-        } catch (JsonProcessingException e) {
-            throw new CustomBadRequestException("Error parsing JSON data", e);
-        } catch (Exception e) {
-            throw new CustomInternalServerErrorException("An unexpected error occurred", e);
-        }
+    public void setNotes(Map<String, String> notes) {
+        this.notes = notes;
     }
 }
+
+
+  @Autowired
+    private RxSotGppDataRepository rxSotGppDataRepository;
+
+    public NotesDTO fetchNotesBySotId(Long sotId) {
+        RxSotGppData entity = rxSotGppDataRepository.findBySotId(sotId);
+        
+        // Assuming notes are stored as a JSON string, you would need to parse this JSON
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, String> notesMap;
+        try {
+            notesMap = mapper.readValue(entity.getNotes(), new TypeReference<Map<String, String>>(){});
+        } catch (IOException e) {
+            throw new RuntimeException("Error parsing notes", e);
+        }
+
+        // Sort notes by key, based on the number after "Notes"
+        Map<String, String> sortedNotes = notesMap.entrySet().stream()
+                .sorted(Comparator.comparing(e -> Integer.parseInt(e.getKey().replaceAll("\\D+", ""))))
+                .collect(Collectors.toMap(
+                        e -> "Note " + e.getKey().replaceAll("\\D+", ""), // Rename key to "Note 1", "Note 2", etc.
+                        Map.Entry::getValue,
+                        (oldValue, newValue) -> oldValue, LinkedHashMap::new));
+
+        return new NotesDTO(sortedNotes);
+    }
+	
+	
+	--------------------------
+	  public NotesDTO fetchNotesBySotId(Long sotId) {
+        String notesJson = rxSotGppDataRepository.findNotesBySotId(sotId);
+        
+        // Assuming notes are stored as a JSON string, parse this JSON
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, String> notesMap;
+        try {
+            notesMap = mapper.readValue(notesJson, new TypeReference<Map<String, String>>() {});
+        } catch (IOException e) {
+            throw new RuntimeException("Error parsing notes", e);
+        }
+
+        // Sort notes by key, based on the number after "Notes"
+        Map<String, String> sortedNotes = notesMap.entrySet().stream()
+                .sorted(Comparator.comparing(e -> Integer.parseInt(e.getKey().replaceAll("\\D+", ""))))
+                .collect(Collectors.toMap(
+                        e -> "Note " + e.getKey().replaceAll("\\D+", ""), // Rename key to "Note 1", "Note 2", etc.
+                        Map.Entry::getValue,
+                        (oldValue, newValue) -> oldValue, LinkedHashMap::new));
+
+        return new NotesDTO(sortedNotes);
+    }
+	-------------------------
