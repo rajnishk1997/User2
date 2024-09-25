@@ -1,129 +1,20 @@
-@PostMapping("/login")
-public ResponseEntity<JwtResponse> createJwtToken(@RequestBody JwtRequest jwtRequest) {
-    long startTime = System.currentTimeMillis();
-    Integer currentUserRid = null;
+ @Value("${client_id}")
+    private String clientId;
 
-    try {
-        String loginIdentifier = jwtRequest.getUserName();
-        String code = ""; // Assume this will be populated from the request
+    @Value("${redirect_uri}")
+    private String redirectUri;
 
-        // Check if the provided input is an email
-        if (isValidEmail(loginIdentifier)) {
-            // If it's an email, directly call the service layer with the email
-            JwtResponse customJwtResponse = jwtService.createJwtTokenByEmail(loginIdentifier, jwtRequest.getUserPassword());
-            currentUserRid = customJwtResponse.getCurrentUserId();
-            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for email: " + loginIdentifier, currentUserRid);
-        } else {
-            // If it's not an email, assume it's a username
-            JwtResponse customJwtResponse = jwtService.createJwtTokenByUsername(loginIdentifier, jwtRequest.getUserPassword());
-            currentUserRid = customJwtResponse.getCurrentUserId();
-            auditTrailService.logAuditTrailWithUsername("createJwtToken", "SUCCESS", "Logged In successfully for username: " + loginIdentifier, currentUserRid);
-        }
+    @Value("${grant_type}")
+    private String grantType;
 
-        // Now obtain the access token and user info
-        String accessToken = getAccessToken(code);
-        if (accessToken != null) {
-            String userInfo = getUserInfo(accessToken);
-            return ResponseEntity.ok(new JwtResponse(200, "Success", userInfo, null, null, null));
-        } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new JwtResponse(500, "Internal Server Error", "Failed to obtain access token", null, null, null));
-        }
+    @Value("${scope}")
+    private String scope;
 
-    } catch (BadCredentialsException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new JwtResponse(401, "Unauthorized", "Invalid Credentials", null, null, null));
-    } catch (UsernameNotFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new JwtResponse(404, "Not Found", "User not found", null, null, null));
-    } catch (Exception e) {
-        logger.error("Unexpected error occurred: ", e); // Log the exception for debugging
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new JwtResponse(500, "Internal Server Error", "Something went wrong", null, null, null));
-    } finally {
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        logger.info("Login Action performed in " + duration + "ms");
-    }
-}
+    @Value("${client_secret}")
+    private String clientSecret;
 
-// Method to get access token from OAuth2 provider
-private String getAccessToken(String code) {
-    try {
-        String url = properties.getProperty("url_oauth");
-        String clientId = properties.getProperty("client_id");
-        String redirectUri = properties.getProperty("redirect_uri");
-        String grantType = properties.getProperty("grant_type");
-        String clientSecret = properties.getProperty("client_secret");
-        String scope = properties.getProperty("scope");
+    @Value("${url_oauth}")
+    private String urlOauth;
 
-        URL obj = new URL(url);
-        HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-        con.setRequestMethod("POST");
-        con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        con.setDoOutput(true);
-
-        String urlParameters = String.format("client_id=%s&redirect_uri=%s&grant_type=%s&scope=%s&client_secret=%s&code=%s",
-                clientId, redirectUri, grantType, scope, clientSecret, code);
-
-        try (OutputStream os = con.getOutputStream()) {
-            os.write(urlParameters.getBytes());
-            os.flush();
-        }
-
-        int responseCode = con.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String inputLine;
-
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            return parseAccessToken(response.toString());
-        } else {
-            logger.error("Failed to obtain access token: HTTP " + responseCode);
-        }
-    } catch (Exception e) {
-        logger.error("Error obtaining access token: ", e);
-    }
-    return null;
-}
-
-// Method to parse access token from the response
-private String parseAccessToken(String jsonResponse) {
-    // Implement JSON parsing to extract access_token
-    int startIndex = jsonResponse.indexOf("\"access_token\":\"") + 16;
-    int endIndex = jsonResponse.indexOf("\"", startIndex);
-    return jsonResponse.substring(startIndex, endIndex);
-}
-
-// Method to get user info from the user info API
-private String getUserInfo(String accessToken) {
-    try {
-        String url = properties.getProperty("url_userinfo");
-        URL obj = new URL(url);
-        HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-        con.setRequestMethod("GET");
-        con.setRequestProperty("Authorization", "Bearer " + accessToken);
-
-        int responseCode = con.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String inputLine;
-
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            return response.toString(); // Return user info as a JSON string
-        } else {
-            logger.error("Failed to get user info: HTTP " + responseCode);
-        }
-    } catch (Exception e) {
-        logger.error("Error getting user info: ", e);
-    }
-    return null;
-}
+    @Value("${url_userinfo}")
+    private String urlUserinfo;
