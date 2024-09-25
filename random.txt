@@ -1,111 +1,66 @@
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
+public JwtResponse createJwtTokenByEmail(String userEmail, String userName, String firstName, String lastName, String fullName, String managerMISName) throws BadCredentialsException, UsernameNotFoundException {
+    // Find the user by email
+    User user = userDao.findByUserEmail(userEmail)
+            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
-@RestController
-public class AuthController {
-
-    @Value("${client_id}")
-    private String clientId;
-
-    @Value("${redirect_uri}")
-    private String redirectUri;
-
-    @Value("${grant_type}")
-    private String grantType;
-
-    @Value("${scope}")
-    private String scope;
-
-    @Value("${client_secret}")
-    private String clientSecret;
-
-    @Value("${url_oauth}")
-    private String urlOauth;
-
-    @Value("${url_userinfo}")
-    private String urlUserinfo;
-
-    @PostMapping("/login")
-    public ResponseEntity<JwtResponse> createJwtToken(@RequestBody JwtRequest jwtRequest) {
-        String code = jwtRequest.getCode(); // Assume the code comes from the request body
-
-        String accessToken = getAccessToken(code);
-        if (accessToken != null) {
-            String userInfo = getUserInfo(accessToken);
-            return ResponseEntity.ok(new JwtResponse(200, "Success", userInfo, null, null, null));
-        } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new JwtResponse(500, "Internal Server Error", "Failed to obtain access token", null, null, null));
-        }
+    // Check if user is active
+    if (!user.isActiveUser()) {
+        throw new UsernameNotFoundException("User is not active");
     }
 
-    private String getAccessToken(String code) {
-        RestTemplate restTemplate = new RestTemplate();
-
-        // Prepare request body as x-www-form-urlencoded
-        String requestBody = String.format(
-                "client_id=%s&redirect_uri=%s&grant_type=%s&scope=%s&client_secret=%s&code=%s",
-                URLEncoder.encode(clientId, StandardCharsets.UTF_8),
-                URLEncoder.encode(redirectUri, StandardCharsets.UTF_8),
-                URLEncoder.encode(grantType, StandardCharsets.UTF_8),
-                URLEncoder.encode(scope, StandardCharsets.UTF_8),
-                URLEncoder.encode(clientSecret, StandardCharsets.UTF_8),
-                URLEncoder.encode(code, StandardCharsets.UTF_8)
-        );
-
-        // Set headers
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
-
-        // Create request entity
-        HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
-
-        // Make POST request
-        ResponseEntity<String> response = restTemplate.exchange(urlOauth, HttpMethod.POST, requestEntity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            return parseAccessToken(response.getBody());
-        } else {
-            // Handle error response
-            return null;
-        }
+    // Authenticate user by userName and userEmail
+    if (!user.getUserName().equals(userName)) {
+        throw new BadCredentialsException("Invalid userName or email");
     }
 
-    private String parseAccessToken(String jsonResponse) {
-        // Simple parsing for access_token
-        int startIndex = jsonResponse.indexOf("\"access_token\":\"") + 16;
-        int endIndex = jsonResponse.indexOf("\"", startIndex);
-        return jsonResponse.substring(startIndex, endIndex);
+    // Update user's information (userName, firstName, lastName, fullName, managerMISName)
+    user.setUserName(userName);
+    user.setFirstName(firstName);
+    user.setLastName(lastName);
+    user.setFullName(fullName);
+    user.setManagerMISName(managerMISName);
+
+    // Save updated user information
+    userDao.save(user);
+
+    // Handle managerMISName logic
+    User managerUser = userDao.findByUserName(managerMISName).orElse(null);
+
+    if (managerUser == null) {
+        // Manager is not in the system, insert a new user with userName = managerMISName and isActiveUser = false
+        managerUser = new User();
+        managerUser.setUserName(managerMISName);
+        managerUser.setActiveUser(false);
+        userDao.save(managerUser);
     }
 
-    private String getUserInfo(String accessToken) {
-        RestTemplate restTemplate = new RestTemplate();
+    // Set manager_id for the authenticated user to the userRid of the manager
+    user.setManagerId(managerUser.getUserRid());
 
-        // Set headers for GET request
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + accessToken);
-        
-        // Create request entity (no body for GET)
-        HttpEntity<String> requestEntity = new HttpEntity<>(headers);
+    // Save updated user with manager_id
+    userDao.save(user);
 
-        // Make GET request
-        ResponseEntity<String> response = restTemplate.exchange(urlUserinfo, HttpMethod.GET, requestEntity, String.class);
+    // Load user details for JWT generation
+    UserDetails userDetails = loadUserByUsername(user.getUserName());
+    String newGeneratedToken = jwtUtil.generateToken(userDetails);
 
-        if (response.getStatusCode().is2xxSuccessful()) {
-            return response.getBody(); // User info JSON response
-        } else {
-            // Handle error response
-            return null;
-        }
+    // Create role and permission information
+    Set<RoleInfo> roleInfos = new HashSet<>();
+    for (UserRole userRole : user.getUserRoles()) {
+        Role role = userRole.getRole();
+        RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
+
+        Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
+                .map(rolePermission -> {
+                    Permission permission = rolePermission.getPermission();
+                    return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
+                })
+                .collect(Collectors.toSet());
+
+        roleInfo.setPermissions(permissionInfos);
+        roleInfos.add(roleInfo);
     }
+
+    // Return response with JWT token and user info
+    return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
 }
