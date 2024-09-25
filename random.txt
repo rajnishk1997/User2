@@ -1,11 +1,12 @@
- // Extract the CN value (prai8 in this case)
-            String managerCN = null;
-            if (manager != null && manager.startsWith("CN=")) {
-                String[] parts = manager.split(",");
-                for (String part : parts) {
-                    if (part.startsWith("CN=")) {
-                        managerCN = part.substring(3); // Extract the value after "CN="
-                        break;
-                    }
-                }
-            }
+User managerUser = userDao.findByUserName(managerMISName)
+        .orElseGet(() -> {
+            // Insert a new manager user with isActive = false if the manager is not found
+            User newManagerUser = new User();
+            newManagerUser.setUserName(managerMISName);
+            newManagerUser.setActiveUser(false);
+            return userDao.save(newManagerUser);
+        });
+
+// Set manager for the authenticated user
+user.setManager(managerUser);
+userDao.save(user);
