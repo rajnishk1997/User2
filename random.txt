@@ -1,66 +1,11 @@
-public JwtResponse createJwtTokenByEmail(String userEmail, String userName, String firstName, String lastName, String fullName, String managerMISName) throws BadCredentialsException, UsernameNotFoundException {
-    // Find the user by email
-    User user = userDao.findByUserEmail(userEmail)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-    // Check if user is active
-    if (!user.isActiveUser()) {
-        throw new UsernameNotFoundException("User is not active");
-    }
-
-    // Authenticate user by userName and userEmail
-    if (!user.getUserName().equals(userName)) {
-        throw new BadCredentialsException("Invalid userName or email");
-    }
-
-    // Update user's information (userName, firstName, lastName, fullName, managerMISName)
-    user.setUserName(userName);
-    user.setFirstName(firstName);
-    user.setLastName(lastName);
-    user.setFullName(fullName);
-    user.setManagerMISName(managerMISName);
-
-    // Save updated user information
-    userDao.save(user);
-
-    // Handle managerMISName logic
-    User managerUser = userDao.findByUserName(managerMISName).orElse(null);
-
-    if (managerUser == null) {
-        // Manager is not in the system, insert a new user with userName = managerMISName and isActiveUser = false
-        managerUser = new User();
-        managerUser.setUserName(managerMISName);
-        managerUser.setActiveUser(false);
-        userDao.save(managerUser);
-    }
-
-    // Set manager_id for the authenticated user to the userRid of the manager
-    user.setManagerId(managerUser.getUserRid());
-
-    // Save updated user with manager_id
-    userDao.save(user);
-
-    // Load user details for JWT generation
-    UserDetails userDetails = loadUserByUsername(user.getUserName());
-    String newGeneratedToken = jwtUtil.generateToken(userDetails);
-
-    // Create role and permission information
-    Set<RoleInfo> roleInfos = new HashSet<>();
-    for (UserRole userRole : user.getUserRoles()) {
-        Role role = userRole.getRole();
-        RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
-
-        Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
-                .map(rolePermission -> {
-                    Permission permission = rolePermission.getPermission();
-                    return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
-                })
-                .collect(Collectors.toSet());
-
-        roleInfo.setPermissions(permissionInfos);
-        roleInfos.add(roleInfo);
-    }
-
-    // Return response with JWT token and user info
-    return new JwtResponse(201, null, "Successfully Logged In", newGeneratedToken, roleInfos, user);
-}
+ // Extract the CN value (prai8 in this case)
+            String managerCN = null;
+            if (manager != null && manager.startsWith("CN=")) {
+                String[] parts = manager.split(",");
+                for (String part : parts) {
+                    if (part.startsWith("CN=")) {
+                        managerCN = part.substring(3); // Extract the value after "CN="
+                        break;
+                    }
+                }
+            }
