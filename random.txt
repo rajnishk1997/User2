@@ -1,12 +1,79 @@
-User managerUser = userDao.findByUserName(managerMISName)
-        .orElseGet(() -> {
-            // Insert a new manager user with isActive = false if the manager is not found
-            User newManagerUser = new User();
-            newManagerUser.setUserName(managerMISName);
-            newManagerUser.setActiveUser(false);
-            return userDao.save(newManagerUser);
-        });
+private String getUserInfo(String accessToken) {
+    RestTemplate restTemplate = new RestTemplate();
 
-// Set manager for the authenticated user
-user.setManager(managerUser);
-userDao.save(user);
+    HttpHeaders headers = new HttpHeaders();
+    headers.set("Authorization", "Bearer " + accessToken);
+    
+    // Log request details
+    System.out.println("Request URL: " + urlUserinfo);
+    System.out.println("Authorization Header: " + headers.get("Authorization"));
+
+    HttpEntity<String> requestEntity = new HttpEntity<>(headers);
+
+    try {
+        ResponseEntity<String> response = restTemplate.exchange(urlUserinfo, HttpMethod.GET, requestEntity, String.class);
+
+        // Log response details
+        System.out.println("Response Status: " + response.getStatusCode());
+        System.out.println("Response Body: " + response.getBody());
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            return response.getBody();
+        } else {
+            return null;
+        }
+    } catch (HttpClientErrorException e) {
+        // Log the error details
+        System.out.println("Error Status Code: " + e.getStatusCode());
+        System.out.println("Error Response Body: " + e.getResponseBodyAsString());
+        return null;
+    }
+}
+
+
+
+headers.set("Authorization", "Bearer " + URLEncoder.encode(accessToken, StandardCharsets.UTF_8));
+
+
+
+
+import org.springframework.http.HttpClientErrorException;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+
+private String getAccessToken(String code) {
+    RestTemplate restTemplate = new RestTemplate();
+
+    // Prepare request body as MultiValueMap
+    MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
+    requestBody.add("client_id", clientId);
+    requestBody.add("redirect_uri", redirectUri);
+    requestBody.add("grant_type", grantType);
+    requestBody.add("scope", scope);
+    requestBody.add("client_secret", clientSecret);
+    requestBody.add("code", code);
+
+    // Set headers
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
+
+    // Create request entity
+    HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
+
+    try {
+        // Make POST request
+        ResponseEntity<String> response = restTemplate.exchange(urlOauth, HttpMethod.POST, requestEntity, String.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            return parseAccessToken(response.getBody());
+        } else {
+            // Handle error response
+            System.out.println("Error response: " + response.getBody());
+            return null;
+        }
+    } catch (HttpClientErrorException e) {
+        // Catch 4xx and other errors
+        System.out.println("Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+        return null;
+    }
+}
