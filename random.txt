@@ -1,79 +1,39 @@
-private String getUserInfo(String accessToken) {
-    RestTemplate restTemplate = new RestTemplate();
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.set("Authorization", "Bearer " + accessToken);
-    
-    // Log request details
-    System.out.println("Request URL: " + urlUserinfo);
-    System.out.println("Authorization Header: " + headers.get("Authorization"));
-
-    HttpEntity<String> requestEntity = new HttpEntity<>(headers);
-
-    try {
-        ResponseEntity<String> response = restTemplate.exchange(urlUserinfo, HttpMethod.GET, requestEntity, String.class);
-
-        // Log response details
-        System.out.println("Response Status: " + response.getStatusCode());
-        System.out.println("Response Body: " + response.getBody());
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            return response.getBody();
-        } else {
-            return null;
+// Fetch the user by their unique ID
+    Optional<User> findByUserRid(int userRid);
+	
+	
+	 public Set<String> getLoggedInUserRoles(int userRid) {
+        // Fetch the user based on the provided user ID
+        Optional<User> userOptional = userDao.findByUserRid(userRid);
+        
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            
+            // Extract role names from userRoles
+            Set<String> roleNames = user.getUserRoles().stream()
+                .map(userRole -> userRole.getRole().getRoleName())
+                .collect(Collectors.toSet());
+                
+            return roleNames;
         }
-    } catch (HttpClientErrorException e) {
-        // Log the error details
-        System.out.println("Error Status Code: " + e.getStatusCode());
-        System.out.println("Error Response Body: " + e.getResponseBodyAsString());
-        return null;
+        return Collections.emptySet();
     }
-}
-
-
-
-headers.set("Authorization", "Bearer " + URLEncoder.encode(accessToken, StandardCharsets.UTF_8));
-
-
-
-
-import org.springframework.http.HttpClientErrorException;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-
-private String getAccessToken(String code) {
-    RestTemplate restTemplate = new RestTemplate();
-
-    // Prepare request body as MultiValueMap
-    MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
-    requestBody.add("client_id", clientId);
-    requestBody.add("redirect_uri", redirectUri);
-    requestBody.add("grant_type", grantType);
-    requestBody.add("scope", scope);
-    requestBody.add("client_secret", clientSecret);
-    requestBody.add("code", code);
-
-    // Set headers
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
-
-    // Create request entity
-    HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
-
-    try {
-        // Make POST request
-        ResponseEntity<String> response = restTemplate.exchange(urlOauth, HttpMethod.POST, requestEntity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            return parseAccessToken(response.getBody());
-        } else {
-            // Handle error response
-            System.out.println("Error response: " + response.getBody());
-            return null;
+	
+	
+	
+	   // API to get roles of the user based on userRid
+    @GetMapping("/{userRid}/roles")
+    public ResponseEntity<Set<String>> getUserRoles(@PathVariable int userRid) {
+        // Fetch the roles based on the user ID
+        Set<String> roles = userService.getLoggedInUserRoles(userRid);
+        
+        if (roles.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptySet());
         }
-    } catch (HttpClientErrorException e) {
-        // Catch 4xx and other errors
-        System.out.println("Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
-        return null;
+        
+        return ResponseEntity.ok(roles);
     }
-}
+	
+	
+	
+	
