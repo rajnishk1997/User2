@@ -1,39 +1,85 @@
-// Fetch the user by their unique ID
-    Optional<User> findByUserRid(int userRid);
-	
-	
-	 public Set<String> getLoggedInUserRoles(int userRid) {
-        // Fetch the user based on the provided user ID
-        Optional<User> userOptional = userDao.findByUserRid(userRid);
-        
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            
-            // Extract role names from userRoles
-            Set<String> roleNames = user.getUserRoles().stream()
-                .map(userRole -> userRole.getRole().getRoleName())
-                .collect(Collectors.toSet());
-                
-            return roleNames;
-        }
-        return Collections.emptySet();
+public class NetworkTypeDTO {
+    private int id;
+    private String name;
+
+    // Constructor
+    public NetworkTypeDTO(int id, String name) {
+        this.id = id;
+        this.name = name;
     }
-	
-	
-	
-	   // API to get roles of the user based on userRid
-    @GetMapping("/{userRid}/roles")
-    public ResponseEntity<Set<String>> getUserRoles(@PathVariable int userRid) {
-        // Fetch the roles based on the user ID
-        Set<String> roles = userService.getLoggedInUserRoles(userRid);
-        
-        if (roles.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptySet());
-        }
-        
-        return ResponseEntity.ok(roles);
+
+    // Getters and setters
+    public int getId() {
+        return id;
     }
-	
-	
-	
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+
+@RestController
+@RequestMapping("/api/network-types")
+public class NetworkProjectTypeController {
+
+    @Autowired
+    private NetworkTypeDao networkTypeDao;
+
+    // GET API to retrieve all Network Types
+    @GetMapping
+    public ResponseEntity<List<NetworkTypeDTO>> getAllNetworkTypes() {
+        // Fetch all network types from the database
+        List<NetworkType> networkTypes = networkTypeDao.findAll();
+        
+        // Convert to DTOs
+        List<NetworkTypeDTO> networkTypeDTOs = networkTypes.stream()
+            .map(nt -> new NetworkTypeDTO(nt.getNetworkTypeRid(), nt.getNetworkTypeName()))
+            .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(networkTypeDTOs);
+    }
+}
+
+
+
+
+-----------------------------------------
+  @Autowired
+    private UserDao userDao; // Inject UserDao
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<NetworkTypeDTO>> getNetworkTypesByUserId(@PathVariable int userId) {
+        // Find the user by ID
+        Optional<User> userOptional = userDao.findById(userId);
+        
+        // Check if user exists
+        if (!userOptional.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                 .body(Collections.emptyList());
+        }
+
+        // Get the user object
+        User user = userOptional.get();
+
+        // Fetch the network types associated with the user
+        Set<NetworkType> networkTypes = user.getNetworkTypes();
+        
+        // Convert to DTOs
+        List<NetworkTypeDTO> networkTypeDTOs = networkTypes.stream()
+            .map(nt -> new NetworkTypeDTO(nt.getNetworkTypeRid(), nt.getNetworkTypeName()))
+            .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(networkTypeDTOs);
+    }
+	--------------------------------------------------
 	
