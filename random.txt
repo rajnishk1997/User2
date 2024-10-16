@@ -1,21 +1,27 @@
 @Query("SELECT u FROM User u WHERE " +
-"(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName IN ('Auditor', 'Manager'))) " +
+"(u.manager.userRid = :managerId AND " +
+"EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " +
 "OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
-List<User> findAuditorsAndManagersUnderHierarchy(@Param("managerId") Integer managerId);
+List<User> findAuditorsUnderManagerHierarchy(@Param("managerId") Integer managerId);
 
 
 
 private void fetchUsersInHierarchyRecursive(Integer managerId, Set<User> users) {
-    // Fetch the immediate users under the manager (both auditors and managers)
-    List<User> immediateUsers = userDao.findAuditorsAndManagersUnderHierarchy(managerId);
+    // Fetch the immediate users under the manager
+    List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(managerId);
 
     for (User user : immediateUsers) {
-        // Add the user if not already present in the set (ensures no duplicates)
-        if (users.add(user)) {
-            // Check if the user is a manager
-            if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
-                // Recursively fetch subordinates of the manager
-                fetchUsersInHierarchyRecursive(user.getUserRid(), users);
+        // Check if the user has an Auditor role
+        boolean hasAuditorRole = user.getUserRoles().stream()
+                .anyMatch(role -> "Auditor".equals(role.getRole().getRoleName()));
+
+        // Only add the user if they are an Auditor or they are a Manager with an Auditor role
+        if (hasAuditorRole || user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
+            if (users.add(user)) {
+                // If the user is a Manager, recurse into their hierarchy
+                if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
+                    fetchUsersInHierarchyRecursive(user.getUserRid(), users);
+                }
             }
         }
     }
