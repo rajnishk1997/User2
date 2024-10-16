@@ -1,5 +1,30 @@
-@Query("SELECT u FROM User u WHERE " +
-       "(u.userRid = :managerId AND EXISTS (SELECT 1 FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " + // Include the manager if they are an auditor
-       "OR (u.manager.userRid = :managerId AND EXISTS (SELECT 1 FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " + // Include if subordinates have auditor role
-       "OR (u.manager.userRid IN (SELECT m.userRid FROM User m WHERE m.manager.userRid = :managerId))") // Check if the user is in the hierarchy below the specified manager
-List<User> findAuditorsUnderManagerHierarchy(@Param("managerId") Integer managerId);
+@Service
+public class NetworkService {
+
+    @Autowired
+    private SOTNetworkMasterRepository sotNetworkMasterRepository;
+
+    public List<SOTNetworkMaster> getNetworksByPlatform(String platformName) {
+        // Fetch sp_rid based on platform name
+        Integer spRid = sotNetworkMasterRepository.findSpRidByPlatformName(platformName);
+        
+        if (spRid == null) {
+            throw new RuntimeException("Platform not found with name: " + platformName);
+        }
+
+        // Fetch all SOTNetworkMaster entries based on sp_rid
+        return sotNetworkMasterRepository.findAllByPlatformId(spRid);
+    }
+}
+
+
+public interface SOTNetworkMasterRepository extends JpaRepository<SOTNetworkMaster, Integer> {
+
+    // Query to fetch sp_rid from SPlatform table based on platform name
+    @Query("SELECT sp.spRid FROM SPlatform sp WHERE sp.platformName = :platformName")
+    Integer findSpRidByPlatformName(@Param("platformName") String platformName);
+
+    // Query to fetch all SOTNetworkMaster entries based on sp_rid
+    @Query("SELECT sn FROM SOTNetworkMaster sn WHERE sn.platform.spRid = :spRid")
+    List<SOTNetworkMaster> findAllByPlatformId(@Param("spRid") Integer spRid);
+}
