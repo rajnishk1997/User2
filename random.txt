@@ -1,8 +1,65 @@
-  public List<SOTNetworkMaster> getNetworksByPlatform(String platformName) {
-        // Fetch all SOTNetworkMaster entries based on platform name in a single query
-        return sotNetworkMasterRepository.findAllByPlatformName(platformName);
+@RequestParam List<Map<String, String>> param
+
+
+@Repository
+public interface SOTNetworkMasterRepository extends JpaRepository<SOTNetworkMaster, Integer> {
+
+    @Query("SELECT s FROM SPlatform s WHERE s.platformName = :platformName")
+    SPlatform findPlatformByName(@Param("platformName") String platformName);
+
+    @Query(value = "INSERT INTO rx_sot_gpp_network_mapping (s_sot_network_name, s_gpp_network_name, s_platform_id) " +
+                   "VALUES (:sotNetworkName, :gppNetworkName, :spRid)", nativeQuery = true)
+    @Modifying
+    @Transactional
+    void insertSotNetworkMaster(@Param("sotNetworkName") String sotNetworkName,
+                                @Param("gppNetworkName") String gppNetworkName,
+                                @Param("spRid") Integer spRid);
+}
+
+
+@Service
+public class NetworkService {
+
+    @Autowired
+    private SOTNetworkMasterRepository sotNetworkMasterRepository;
+
+    @Transactional
+    public ValidateJsonDTO compareSotAndJsonDT4(Long uid, Integer currentUserId, String projectName, List<Map<String, String>> networkInformation, String platformName) {
+        // Execute logic in a separate thread
+        Runnable task = () -> {
+            try {
+                // Fetch platform based on platformName
+                SPlatform platform = sotNetworkMasterRepository.findPlatformByName(platformName);
+                if (platform == null) {
+                    throw new RuntimeException("Platform not found: " + platformName);
+                }
+
+                Integer spRid = platform.getSpRid(); // Get the spRid
+
+                // Iterate over networkInformation
+                for (Map<String, String> networkMap : networkInformation) {
+                    String sotNetworkName = networkMap.get("0");
+                    String gppNetworkName = networkMap.get("1");
+
+                    // Check if sotNetworkName exists in SOTNetworkMaster
+                    SOTNetworkMaster existingNetwork = sotNetworkMasterRepository.findBySotNetworkName(sotNetworkName);
+                    if (existingNetwork == null) {
+                        // Insert a new row with a single query
+                        sotNetworkMasterRepository.insertSotNetworkMaster(sotNetworkName, gppNetworkName, spRid);
+                        System.out.println("Added new SOT Network: " + sotNetworkName + " with GPP Network: " + gppNetworkName);
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace(); // Handle exceptions
+                // You can log the exception or send alerts based on your application requirements
+            }
+        };
+
+        // Start a new thread
+        new Thread(task).start();
+
+        // Return result (adjust as per your actual return type/logic)
+        return new ValidateJsonDTO();  // Modify as necessary
     }
-	
-	// Single query to fetch all SOTNetworkMaster entries based on platformName in SPlatform
-    @Query("SELECT sn FROM SOTNetworkMaster sn WHERE sn.platform.platformName = :platformName")
-    List<SOTNetworkMaster> findAllByPlatformName(@Param("platformName") String platformName);
+}
