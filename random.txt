@@ -1,1 +1,4 @@
-%5B%7B%220%22%3A%22ABCD%22%2C%221%22%3A%22ABCDEF%22%7D%2C%7B%220%22%3A%22RAJNISH%22%2C%221%22%3A%22RAJNISH%22%7D%5D
+  @Query("SELECT s FROM SOTNetworkMaster s WHERE s.sotNetworkName = :sotNetworkName AND s.platform.spRid = :spRid")
+    SOTNetworkMaster findBySotNetworkNameAndPlatform(@Param("sotNetworkName") String sotNetworkName, @Param("spRid") Integer spRid);
+	
+	
