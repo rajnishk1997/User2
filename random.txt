@@ -1,7 +1,8 @@
 @Query("SELECT u FROM User u WHERE " +
-"(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName IN ('Auditor', 'Manager')))" +
-"OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName IN ('Auditor', 'Manager')))")
+"(u.manager.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName IN ('Auditor', 'Manager'))) " +
+"OR (u.userRid = :managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
 List<User> findAuditorsAndManagersUnderHierarchy(@Param("managerId") Integer managerId);
+
 
 
 private void fetchUsersInHierarchyRecursive(Integer managerId, Set<User> users) {
@@ -19,5 +20,3 @@ private void fetchUsersInHierarchyRecursive(Integer managerId, Set<User> users) 
         }
     }
 }
-
-
