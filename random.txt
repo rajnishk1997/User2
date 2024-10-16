@@ -1,48 +1,5 @@
-public Set<User> getUsersByManagerId(Integer managerId, String isHierarchy) {
-    Set<User> users = new HashSet<>();
-    User manager = userDao.findById(managerId).orElse(null);
-    
-    // Include the manager if they have an auditor role
-    if (manager != null && hasAuditorRole(manager)) {
-        users.add(manager);
-    }
-    
-    if (isHierarchy.equals("Y")) {
-        // Fetch all users in hierarchy
-        fetchUsersInHierarchy(managerId, users);
-    } else {
-        // Fetch only immediate users
-        List<User> immediateUsers = userDao.findImmediateAuditorsUnderManager(managerId);
-        users.addAll(immediateUsers);
-    }
-    
-    return users;
-}
-
-private void fetchUsersInHierarchy(Integer managerId, Set<User> users) {
-    Queue<Integer> queue = new LinkedList<>();
-    queue.add(managerId);
-
-    while (!queue.isEmpty()) {
-        Integer currentManagerId = queue.poll();
-        List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(currentManagerId);
-
-        for (User user : immediateUsers) {
-            // Add user to the set, preventing duplicates
-            if (users.add(user)) {
-                // Check if the user is a manager and add them to the queue to explore their subordinates
-                if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
-                    queue.add(user.getUserRid());
-                }
-            }
-        }
-    }
-}
-
-@Query("SELECT u FROM User u WHERE u.isActiveUser = true AND "+
-"(u.manager.userRid =:managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))"+
-"OR (u.userRid =:managerId AND EXISTS (SELECT r FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor'))")
+@Query("SELECT u FROM User u WHERE " +
+       "(u.userRid = :managerId AND EXISTS (SELECT 1 FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " + // Include the manager if they are an auditor
+       "OR (u.manager.userRid = :managerId AND EXISTS (SELECT 1 FROM u.userRoles ur JOIN ur.role r WHERE r.roleName = 'Auditor')) " + // Include if subordinates have auditor role
+       "OR (u.manager.userRid IN (SELECT m.userRid FROM User m WHERE m.manager.userRid = :managerId))") // Check if the user is in the hierarchy below the specified manager
 List<User> findAuditorsUnderManagerHierarchy(@Param("managerId") Integer managerId);
-
-
-
