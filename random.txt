@@ -1,4 +1,10 @@
-  @Query("SELECT s FROM SOTNetworkMaster s WHERE s.sotNetworkName = :sotNetworkName AND s.platform.spRid = :spRid")
-    SOTNetworkMaster findBySotNetworkNameAndPlatform(@Param("sotNetworkName") String sotNetworkName, @Param("spRid") Integer spRid);
-	
-	
+ // Count the number of records with the same sotNetworkName and spRid
+                    int count = sotNetworkMasterRepository.countBySotNetworkNameAndPlatform(sotNetworkName, spRid);
+                    if (count == 0) {
+                        // If no such record exists, insert a new row
+                        sotNetworkMasterRepository.insertSotNetworkMaster(sotNetworkName, gppNetworkName, spRid);
+                        System.out.println("Added new SOT Network: " + sotNetworkName + " with GPP Network: " + gppNetworkName);
+                    }
+					
+					  @Query("SELECT COUNT(s) FROM SOTNetworkMaster s WHERE s.sotNetworkName = :sotNetworkName AND s.platform.spRid = :spRid")
+    int countBySotNetworkNameAndPlatform(@Param("sotNetworkName") String sotNetworkName, @Param("spRid") Integer spRid);
