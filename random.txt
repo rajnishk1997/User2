@@ -1,39 +1,38 @@
-  public List<String> getOrderedPermissions() {
-        // Split the permissions string, trim each item to remove spaces, and collect into a list
-        return Arrays.stream(permissionOrder.split(","))
-                     .map(String::trim)  // Trim spaces around each permission
-                     .collect(Collectors.toList());
+public List<String> getPermissionOrder() {
+        return Arrays.asList(permissions.split(",\\s*")); // Split by comma and optional space
     }
 	
 	
-	
-	@Autowired
-private PermissionOrderLoader permissionOrderLoader;
+	import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-public Set<RoleInfo> getRoleInfos(User user) {
-    // Fetch the ordered list of permissions from the properties file
-    List<String> orderedPermissions = permissionOrderLoader.getOrderedPermissions();
-    
-    Comparator<PermissionInfo> permissionComparator = Comparator.comparingInt(
-        permission -> orderedPermissions.indexOf(permission.getPermissionName())
-    );
+public void createRoleAndPermissionInfo(User user) {
+    // Assuming PermissionOrder is a Spring Component injected
+    PermissionOrder permissionOrder = new PermissionOrder(); 
+    List<String> orderedPermissions = permissionOrder.getPermissionOrder();
 
     // Create role and permission information
     Set<RoleInfo> roleInfos = new HashSet<>();
     for (UserRole userRole : user.getUserRoles()) {
         Role role = userRole.getRole();
         RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
-        
+
+        // Get permissions and sort them based on the ordered list
         Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
                 .map(rolePermission -> {
                     Permission permission = rolePermission.getPermission();
                     return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
                 })
-                .sorted(permissionComparator)  // Sort the permissions based on the order from properties file
-                .collect(Collectors.toCollection(LinkedHashSet::new)); // Use LinkedHashSet to maintain the order
-        
+                .sorted((p1, p2) -> {
+                    int index1 = orderedPermissions.indexOf(p1.getPermissionName());
+                    int index2 = orderedPermissions.indexOf(p2.getPermissionName());
+                    return Integer.compare(index1, index2);
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new)); // Maintain insertion order
+
         roleInfo.setPermissions(permissionInfos);
         roleInfos.add(roleInfo);
     }
-    return roleInfos;
 }
