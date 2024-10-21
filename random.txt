@@ -1,46 +1,39 @@
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-@Component
-public class PermissionOrderLoader {
-
-    @Value("${permissions}")
-    private String permissionOrder;
-
-    public List<String> getOrderedPermissions() {
-        return Arrays.asList(permissionOrder.split(","));
+  public List<String> getOrderedPermissions() {
+        // Split the permissions string, trim each item to remove spaces, and collect into a list
+        return Arrays.stream(permissionOrder.split(","))
+                     .map(String::trim)  // Trim spaces around each permission
+                     .collect(Collectors.toList());
     }
-}
-
-
-
-@Autowired
+	
+	
+	
+	@Autowired
 private PermissionOrderLoader permissionOrderLoader;
 
-
-// Create role and permission information
-Set<RoleInfo> roleInfos = new HashSet<>();
-for (UserRole userRole : user.getUserRoles()) {
-    Role role = userRole.getRole();
-    RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
-    
+public Set<RoleInfo> getRoleInfos(User user) {
     // Fetch the ordered list of permissions from the properties file
     List<String> orderedPermissions = permissionOrderLoader.getOrderedPermissions();
     
     Comparator<PermissionInfo> permissionComparator = Comparator.comparingInt(
         permission -> orderedPermissions.indexOf(permission.getPermissionName())
     );
-    
-    Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
-            .map(rolePermission -> {
-                Permission permission = rolePermission.getPermission();
-                return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
-            })
-            .sorted(permissionComparator)  // Sort the permissions based on the order from properties file
-            .collect(Collectors.toCollection(LinkedHashSet::new)); // Use LinkedHashSet to maintain the order
-    
-    roleInfo.setPermissions(permissionInfos);
-    roleInfos.add(roleInfo);
+
+    // Create role and permission information
+    Set<RoleInfo> roleInfos = new HashSet<>();
+    for (UserRole userRole : user.getUserRoles()) {
+        Role role = userRole.getRole();
+        RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
+        
+        Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
+                .map(rolePermission -> {
+                    Permission permission = rolePermission.getPermission();
+                    return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
+                })
+                .sorted(permissionComparator)  // Sort the permissions based on the order from properties file
+                .collect(Collectors.toCollection(LinkedHashSet::new)); // Use LinkedHashSet to maintain the order
+        
+        roleInfo.setPermissions(permissionInfos);
+        roleInfos.add(roleInfo);
+    }
+    return roleInfos;
 }
-
-
