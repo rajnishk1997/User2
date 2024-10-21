@@ -19,24 +19,24 @@ public void createRoleAndPermissionInfo(User user) {
                 })
                 .collect(Collectors.toList());
 
-        // Create a list to hold permissions in the defined order
-        List<IndexedPermissionInfo> orderedRolePermissions = new ArrayList<>();
+        // Create a set to hold permissions in the defined order
+        Set<PermissionInfo> orderedRolePermissions = new LinkedHashSet<>();
 
-        // Fill the ordered list with role permissions
+        // Fill the ordered set with role permissions
         for (PermissionConfig.IndexedPermission indexedPermission : orderedPermissions) {
             String permissionName = indexedPermission.getName();
             Optional<PermissionInfo> matchingPermission = rolePermissions.stream()
                     .filter(p -> p.getPermissionName().equalsIgnoreCase(permissionName))
                     .findFirst();
 
-            if (matchingPermission.isPresent()) {
-                // Create an indexed permission info with its index
-                orderedRolePermissions.add(new IndexedPermissionInfo(indexedPermission.getIndex(), permissionName));
-            }
+            // If the permission exists in the role, add it to the ordered set
+            matchingPermission.ifPresent(permission -> 
+                orderedRolePermissions.add(new PermissionInfo(permission.getPermissionRid(), permissionName))
+            );
         }
 
         // Set the ordered permissions to the role info
-        roleInfo.setPermissions(new LinkedHashSet<>(orderedRolePermissions));
+        roleInfo.setPermissions(orderedRolePermissions);
         roleInfos.add(roleInfo);
     }
 }
