@@ -1,16 +1,78 @@
-  public Map<String, Integer> getPermissionOrderMap() {
-        List<String> permissionList = Arrays.asList(permissions.split(",\\s*"));
-        Map<String, Integer> permissionOrderMap = new HashMap<>();
-        for (int i = 0; i < permissionList.size(); i++) {
-            permissionOrderMap.put(permissionList.get(i).toUpperCase(), i); // Store permissions in uppercase for case-insensitivity
-        }
-        return permissionOrderMap;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.transaction.annotation.Transactional;
+import com.optum.dao.PermissionDao;
+import com.optum.entity.Permission;
+
+import javax.annotation.PostConstruct;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Configuration
+@PropertySource({"classpath:application.properties", "classpath:permission.properties"})
+public class PermissionConfig {
+
+    private final PermissionDao permissionRepository;
+
+    @Value("${permissions}")
+    private String permissions;
+
+    private List<IndexedPermission> indexedPermissions;
+
+    public PermissionConfig(PermissionDao permissionRepository) {
+        this.permissionRepository = permissionRepository;
     }
-	
-	  // Assuming PermissionOrder is a Spring Component injected
-    PermissionOrder permissionOrder = new PermissionOrder();
-    Map<String, Integer> orderedPermissionsMap = permissionOrder.getPermissionOrderMap();
-    List<String> orderedPermissionsList = new ArrayList<>(orderedPermissionsMap.keySet());
+
+    @PostConstruct
+    @Transactional
+    public void init() {
+        List<String> permissionNames = Arrays.asList(permissions.split(", "));
+        indexedPermissions = new ArrayList<>();
+        
+        for (int i = 0; i < permissionNames.size(); i++) {
+            String permissionName = permissionNames.get(i);
+            Permission permission = permissionRepository.findByPermissionName(permissionName);
+            if (permission == null) {
+                permission = new Permission(permissionName);
+                permissionRepository.save(permission);
+            }
+            indexedPermissions.add(new IndexedPermission(i, permission.getPermissionName()));
+        }
+    }
+
+    public List<IndexedPermission> getOrderedPermissions() {
+        return indexedPermissions;
+    }
+
+    public static class IndexedPermission {
+        private final int index;
+        private final String name;
+
+        public IndexedPermission(int index, String name) {
+            this.index = index;
+            this.name = name;
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
+}
+
+
+
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+public void createRoleAndPermissionInfo(User user) {
+    // Get the ordered permissions from PermissionConfig
+    List<PermissionConfig.IndexedPermission> orderedPermissions = permissionConfig.getOrderedPermissions();
 
     // Create role and permission information
     Set<RoleInfo> roleInfos = new HashSet<>();
@@ -27,26 +89,23 @@
                 .collect(Collectors.toList());
 
         // Create a list to hold permissions in the defined order
-        List<PermissionInfo> orderedRolePermissions = new ArrayList<>();
+        List<IndexedPermissionInfo> orderedRolePermissions = new ArrayList<>();
 
-        // Fill the ordered list with role permissions, keeping the order intact
-        for (String permissionName : orderedPermissionsList) {
+        // Fill the ordered list with role permissions
+        for (PermissionConfig.IndexedPermission indexedPermission : orderedPermissions) {
+            String permissionName = indexedPermission.getName();
             Optional<PermissionInfo> matchingPermission = rolePermissions.stream()
                     .filter(p -> p.getPermissionName().equalsIgnoreCase(permissionName))
                     .findFirst();
 
             if (matchingPermission.isPresent()) {
-                orderedRolePermissions.add(matchingPermission.get());
-            } else {
-                // If permission is missing, add a placeholder or null (optional)
-                orderedRolePermissions.add(null); // You could also create a PermissionInfo with a default value
+                // Create an indexed permission info with its index
+                orderedRolePermissions.add(new IndexedPermissionInfo(indexedPermission.getIndex(), permissionName));
             }
         }
-
-        // Remove nulls from the orderedRolePermissions if you want to exclude them in the final output
-        orderedRolePermissions.removeIf(Objects::isNull); // Optional, remove if you want to keep placeholders
 
         // Set the ordered permissions to the role info
         roleInfo.setPermissions(new LinkedHashSet<>(orderedRolePermissions));
         roleInfos.add(roleInfo);
     }
+}
