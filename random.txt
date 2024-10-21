@@ -1,17 +1,16 @@
-public List<String> getPermissionOrder() {
-        return Arrays.asList(permissions.split(",\\s*")); // Split by comma and optional space
+  public Map<String, Integer> getPermissionOrderMap() {
+        List<String> permissionList = Arrays.asList(permissions.split(",\\s*"));
+        Map<String, Integer> permissionOrderMap = new HashMap<>();
+        for (int i = 0; i < permissionList.size(); i++) {
+            permissionOrderMap.put(permissionList.get(i).toUpperCase(), i); // Store permissions in uppercase for case-insensitivity
+        }
+        return permissionOrderMap;
     }
 	
-	
-	import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-public void createRoleAndPermissionInfo(User user) {
-    // Assuming PermissionOrder is a Spring Component injected
-    PermissionOrder permissionOrder = new PermissionOrder(); 
-    List<String> orderedPermissions = permissionOrder.getPermissionOrder();
+	  // Assuming PermissionOrder is a Spring Component injected
+    PermissionOrder permissionOrder = new PermissionOrder();
+    Map<String, Integer> orderedPermissionsMap = permissionOrder.getPermissionOrderMap();
+    List<String> orderedPermissionsList = new ArrayList<>(orderedPermissionsMap.keySet());
 
     // Create role and permission information
     Set<RoleInfo> roleInfos = new HashSet<>();
@@ -19,20 +18,35 @@ public void createRoleAndPermissionInfo(User user) {
         Role role = userRole.getRole();
         RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
 
-        // Get permissions and sort them based on the ordered list
-        Set<PermissionInfo> permissionInfos = role.getRolePermissions().stream()
+        // Get permissions for the current role
+        List<PermissionInfo> rolePermissions = role.getRolePermissions().stream()
                 .map(rolePermission -> {
                     Permission permission = rolePermission.getPermission();
                     return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
                 })
-                .sorted((p1, p2) -> {
-                    int index1 = orderedPermissions.indexOf(p1.getPermissionName());
-                    int index2 = orderedPermissions.indexOf(p2.getPermissionName());
-                    return Integer.compare(index1, index2);
-                })
-                .collect(Collectors.toCollection(LinkedHashSet::new)); // Maintain insertion order
+                .collect(Collectors.toList());
 
-        roleInfo.setPermissions(permissionInfos);
+        // Create a list to hold permissions in the defined order
+        List<PermissionInfo> orderedRolePermissions = new ArrayList<>();
+
+        // Fill the ordered list with role permissions, keeping the order intact
+        for (String permissionName : orderedPermissionsList) {
+            Optional<PermissionInfo> matchingPermission = rolePermissions.stream()
+                    .filter(p -> p.getPermissionName().equalsIgnoreCase(permissionName))
+                    .findFirst();
+
+            if (matchingPermission.isPresent()) {
+                orderedRolePermissions.add(matchingPermission.get());
+            } else {
+                // If permission is missing, add a placeholder or null (optional)
+                orderedRolePermissions.add(null); // You could also create a PermissionInfo with a default value
+            }
+        }
+
+        // Remove nulls from the orderedRolePermissions if you want to exclude them in the final output
+        orderedRolePermissions.removeIf(Objects::isNull); // Optional, remove if you want to keep placeholders
+
+        // Set the ordered permissions to the role info
+        roleInfo.setPermissions(new LinkedHashSet<>(orderedRolePermissions));
         roleInfos.add(roleInfo);
     }
-}
