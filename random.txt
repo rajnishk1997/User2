@@ -1,42 +1,10 @@
-import java.util.*;
-import java.util.stream.Collectors;
+ @Query("SELECT r FROM RXSOTProjectDetail r WHERE r.currentUserId = :currentUserId AND r.validationStatus = :validationStatus")
+    List<RXSOTProjectDetail> findPendingSotsByCurrentUserIdAndValidationStatus(
+        @Param("currentUserId") Long currentUserId,
+        @Param("validationStatus") String validationStatus
+    );
+	
+	 Long currentUserId = getCurrentUserId();  // Replace this with your logic to get current user ID
 
-public void createRoleAndPermissionInfo(User user) {
-    // Get the ordered permissions from PermissionConfig
-    List<PermissionConfig.IndexedPermission> orderedPermissions = permissionConfig.getOrderedPermissions();
-
-    // Create role and permission information
-    Set<RoleInfo> roleInfos = new HashSet<>();
-    for (UserRole userRole : user.getUserRoles()) {
-        Role role = userRole.getRole();
-        RoleInfo roleInfo = new RoleInfo(role.getRoleRid(), role.getRoleName());
-
-        // Get permissions for the current role
-        List<PermissionInfo> rolePermissions = role.getRolePermissions().stream()
-                .map(rolePermission -> {
-                    Permission permission = rolePermission.getPermission();
-                    return new PermissionInfo(permission.getPermissionRid(), permission.getPermissionName());
-                })
-                .collect(Collectors.toList());
-
-        // Create a set to hold permissions in the defined order
-        Set<PermissionInfo> orderedRolePermissions = new LinkedHashSet<>();
-
-        // Fill the ordered set with role permissions
-        for (PermissionConfig.IndexedPermission indexedPermission : orderedPermissions) {
-            String permissionName = indexedPermission.getName();
-            Optional<PermissionInfo> matchingPermission = rolePermissions.stream()
-                    .filter(p -> p.getPermissionName().equalsIgnoreCase(permissionName))
-                    .findFirst();
-
-            // If the permission exists in the role, add it to the ordered set
-            matchingPermission.ifPresent(permission -> 
-                orderedRolePermissions.add(new PermissionInfo(permission.getPermissionRid(), permissionName))
-            );
-        }
-
-        // Set the ordered permissions to the role info
-        roleInfo.setPermissions(orderedRolePermissions);
-        roleInfos.add(roleInfo);
-    }
-}
+        // Call the DAO method to get pending SOTs with ValidationStatus = 'Y'
+        return tempDao.findByCurrentUserIdAndValidationStatus(currentUserId, "Y");
