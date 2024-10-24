@@ -1,6 +1,57 @@
- @RequestParam("fromDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate, 
-    @RequestParam("toDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
-	
-	
-	@Query("SELECT COUNT(spd) FROM RXSOTProjectDetail spd WHERE spd.userId = :userId AND spd.projectStatus = :status AND spd.validationStatus = 'Y' AND spd.createdDateTime BETWEEN :fromDate AND :toDate")
-int countByUserAndProjectStatusInDateRange(int userId, String status, LocalDate fromDate, LocalDate toDate);
+import org.springframework.format.annotation.DateTimeFormat;
+import java.util.Date;
+import java.util.Calendar;
+
+@PostMapping("/countProjects")
+public int countProjectsByDate(
+    @RequestParam("userId") int userId, 
+    @RequestParam("status") String status, 
+    @RequestParam(value = "fromDate", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date fromDate, 
+    @RequestParam(value = "toDate", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date toDate) {
+    
+    // Adjust the fromDate to the start of the day (00:00:00)
+    if (fromDate != null) {
+        fromDate = setStartOfDay(fromDate);
+    }
+
+    // Adjust the toDate to the end of the day (23:59:59.999)
+    if (toDate != null) {
+        toDate = setEndOfDay(toDate);
+    }
+
+    return projectService.countByUserAndProjectStatusInDateRange(userId, status, fromDate, toDate);
+}
+
+
+import java.util.Calendar;
+import java.util.Date;
+
+public class DateUtil {
+    // Set time to the start of the day (00:00:00)
+    public static Date setStartOfDay(Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTime();
+    }
+
+    // Set time to the end of the day (23:59:59.999)
+    public static Date setEndOfDay(Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.set(Calendar.HOUR_OF_DAY, 23);
+        cal.set(Calendar.MINUTE, 59);
+        cal.set(Calendar.SECOND, 59);
+        cal.set(Calendar.MILLISECOND, 999);
+        return cal.getTime();
+    }
+}
+
+
+@Query("SELECT COUNT(spd) FROM RXSOTProjectDetail spd WHERE spd.userId = :userId AND spd.projectStatus = :status AND spd.validationStatus = 'Y' AND spd.createdDateTime BETWEEN :fromDate AND :toDate")
+int countByUserAndProjectStatusInDateRange(int userId, String status, Date fromDate, Date toDate);
+
+
