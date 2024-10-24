@@ -1,10 +1,103 @@
- @Query("SELECT r FROM RXSOTProjectDetail r WHERE r.currentUserId = :currentUserId AND r.validationStatus = :validationStatus")
-    List<RXSOTProjectDetail> findPendingSotsByCurrentUserIdAndValidationStatus(
-        @Param("currentUserId") Long currentUserId,
-        @Param("validationStatus") String validationStatus
-    );
-	
-	 Long currentUserId = getCurrentUserId();  // Replace this with your logic to get current user ID
+@GetMapping("/abc/{managerId}")
+public ResponseEntity<ResponseWrapper<AuditorTotalWorkflowCountDTO>> getAuditorReportForManager(
+    @PathVariable int managerId, 
+    @RequestParam String isHierarchy, 
+    @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date fromDate, 
+    @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date toDate) {
 
-        // Call the DAO method to get pending SOTs with ValidationStatus = 'Y'
-        return tempDao.findByCurrentUserIdAndValidationStatus(currentUserId, "Y");
+    // Fetch subordinates based on hierarchy
+    Set<User> reporteeList = allAuditorListService.getUsersByManagerId(managerId, isHierarchy);
+
+    // Fetch closed counts from RXSOTProjectDetail
+    List<ClosedCountResponseDTO> closedCountList = rxsotProjectDetailDao.fetchClosedCountsForUsersAndDateRange(
+        reporteeList, fromDate, toDate);
+
+    // Map closed count data into AuditorTotalWorkflowCountDTO response
+    AuditorTotalWorkflowCountDTO responseDTO = mapClosedCountToDTO(closedCountList);
+
+    return ResponseEntity.ok(new ResponseWrapper<>(responseDTO));
+}
+
+
+public Set<User> getUsersByManagerId(Integer managerId, String isHierarchy) {
+    Set<User> users = new HashSet<>();
+    User manager = userDao.findById(managerId).orElse(null);
+
+    // Check if the manager is not null
+    if (manager != null) {
+        if (isHierarchy.equals("N")) {
+            // Fetch immediate subordinates with Auditor role
+            List<User> immediateSubordinates = userDao.findImmediateAuditorsUnderManager(managerId);
+
+            // Filter subordinates to include only those with the "Auditor" role
+            for (User user : immediateSubordinates) {
+                if (hasAuditorRole(user)) {
+                    users.add(user);
+                }
+            }
+        } else if (isHierarchy.equals("Y")) {
+            // Fetch the full hierarchy, including subordinates with Auditor role, excluding Managers
+            fetchUsersInHierarchy(managerId, users);
+        }
+    }
+    return users;
+}
+
+private void fetchUsersInHierarchy(Integer managerId, Set<User> users) {
+    Queue<Integer> queue = new LinkedList<>();
+    queue.add(managerId);
+    while (!queue.isEmpty()) {
+        Integer currentManagerId = queue.poll();
+        List<User> immediateUsers = userDao.findAuditorsUnderManagerHierarchy(currentManagerId);
+        
+        for (User user : immediateUsers) {
+            if (users.add(user)) {
+                // Only add subordinates with "Auditor" role, exclude "Manager" only roles
+                if (user.getUserRoles().stream().anyMatch(role -> "Auditor".equals(role.getRole().getRoleName()))) {
+                    // If user has Auditor role, proceed to add them
+                    users.add(user);
+                }
+                // Continue hierarchy traversal only for managers
+                if (user.getUserRoles().stream().anyMatch(role -> "Manager".equals(role.getRole().getRoleName()))) {
+                    queue.add(user.getUserRid());
+                }
+            }
+        }
+    }
+}
+
+
+public interface RXSOTProjectDetailDao {
+    @Query("SELECT new ClosedCountResponseDTO(p.date, COUNT(p), p.msId) " +
+           "FROM RXSOTProjectDetail p " +
+           "WHERE p.user IN :users AND p.status = 'CLOSED' " +
+           "AND p.date BETWEEN :fromDate AND :toDate " +
+           "GROUP BY p.date, p.msId")
+    List<ClosedCountResponseDTO> fetchClosedCountsForUsersAndDateRange(
+        @Param("users") Set<User> users,
+        @Param("fromDate") Date fromDate,
+        @Param("toDate") Date toDate
+    );
+}
+
+
+private AuditorTotalWorkflowCountDTO mapClosedCountToDTO(List<ClosedCountResponseDTO> closedCountList) {
+    AuditorTotalWorkflowCountDTO dto = new AuditorTotalWorkflowCountDTO();
+    List<AuditorReportResponseDTO> reportList = new ArrayList<>();
+
+    // Loop through the closed count data and map to DTO
+    for (ClosedCountResponseDTO closedCount : closedCountList) {
+        AuditorReportResponseDTO reportDTO = new AuditorReportResponseDTO();
+        reportDTO.setDate(closedCount.getDate());
+        reportDTO.setClosedCount(closedCount.getClosedCount());
+        reportDTO.setMsId(closedCount.getMsId());
+
+        reportList.add(reportDTO);
+    }
+
+    dto.setAuditorReportResponse(reportList);
+    dto.setTotalClosed(closedCountList.stream().mapToInt(ClosedCountResponseDTO::getClosedCount).sum());
+    // Optionally set totalPending, totalWip, totalSendToBom as needed
+
+    return dto;
+}
