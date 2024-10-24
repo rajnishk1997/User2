@@ -1,2 +1,6 @@
-@Query("SELECT COUNT(spd) FROM RXSOTProjectDetail spd WHERE spd.userId = :userId AND spd.projectStatus = :status AND spd.validationStatus = 'Y' AND spd.createdDateTime BETWEEN :fromDate AND :toDate")
-int countByUserAndProjectStatusInDateRange(int userId, String status, Date fromDate, Date toDate);
+ @RequestParam("fromDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate, 
+    @RequestParam("toDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+	
+	
+	@Query("SELECT COUNT(spd) FROM RXSOTProjectDetail spd WHERE spd.userId = :userId AND spd.projectStatus = :status AND spd.validationStatus = 'Y' AND spd.createdDateTime BETWEEN :fromDate AND :toDate")
+int countByUserAndProjectStatusInDateRange(int userId, String status, LocalDate fromDate, LocalDate toDate);
