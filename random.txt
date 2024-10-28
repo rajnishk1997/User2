@@ -1,5 +1,38 @@
- As a Backend Developer with experience since August 2019, I have honed my skills in Advanced Java, Spring Boot, JSP, JavaScript, Elastic Search, ODBC, and SSO. I have consistently delivered high-quality work, earning recognition as a back-to-back Star Performer in my previous organization, and receiving the Star of the Quarter award at Optum. Most recently, I was honored with the Diamond Performance Award for my contributions to the RxAudit Project.
+public List<RXSOTProjectDetail> getFilteredProjectDetails(Long userId) {
+    // Step 1: Fetch RXSOTProjectDetail records with userId and validationStatus = 'N'
+    List<RXSOTProjectDetail> projectDetails = rxSotProjectDetailRepository.findByUserIdAndValidationStatus(userId);
+
+    if (projectDetails.isEmpty()) {
+        return Collections.emptyList(); // No matching records, return empty list
+    }
+
+    // Collect all sot_id values to check in RXSotGppData
+    List<Long> sotIds = projectDetails.stream()
+                                       .map(RXSOTProjectDetail::getSotId)
+                                       .collect(Collectors.toList());
+
+    // Step 2: Fetch RXSotGppData records with matching uid and status_code = 'STATUS147'
+    List<RXSotGppData> validGppData = rxSotGppDataRepository.findByUidAndStatusCode(sotIds);
+
+    // Step 3: Filter RXSOTProjectDetail records based on valid sot_id values from RXSotGppData
+    Set<Long> validSotIds = validGppData.stream()
+                                        .map(RXSotGppData::getUid)
+                                        .collect(Collectors.toSet());
+
+    return projectDetails.stream()
+                         .filter(detail -> validSotIds.contains(detail.getSotId()))
+                         .collect(Collectors.toList());
+}
 
 
- Current Responsibilities:
-Working as a backend developer, I am independently responsible for delivering high-quality code on time.
+@Query("SELECT r FROM RXSOTProjectDetail r " +
+       "WHERE r.userId = :userId " +
+       "AND r.validationStatus = 'N' " +
+       "ORDER BY r.createdDateTime DESC")
+List<RXSOTProjectDetail> findByUserIdAndValidationStatus(@Param("userId") Long userId);
+
+
+@Query("SELECT g FROM RXSotGppData g " +
+       "WHERE g.uid IN :sotIds " +
+       "AND g.statusCode = 'STATUS147'")
+List<RXSotGppData> findByUidAndStatusCode(@Param("sotIds") List<Long> sotIds);
