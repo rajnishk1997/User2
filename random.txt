@@ -1,6 +1,80 @@
-Staying Informed on Industry Trends and Innovations
-To remain competitive and bring fresh insights to my role, I plan to regularly engage with industry publications, conferences, and tech communities. This will help me stay ahead of emerging trends, new technologies, and evolving best practices in backend development.
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api")
+public class DiscardUploadedSOTController {
+
+    @Autowired
+    private DiscardUploadedSOTService discardUploadedSOTService;
+
+    @DeleteMapping("/discardUploadedSOT")
+    public ResponseEntity<ResponseWrapper<String>> discardUploadedSOT(@RequestParam Long sotId, 
+                                                                      @RequestParam Long currentUserId) {
+        try {
+            String message = discardUploadedSOTService.discardUploadedSOT(sotId, currentUserId);
+            return ResponseEntity.ok(new ResponseWrapper<>(message, new ReqRes("Success", "Data deleted successfully")));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new ResponseWrapper<>("Error occurred while deleting data", 
+                                                                      new ReqRes("Error", e.getMessage())));
+        }
+    }
+}
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-To achieve my goal of staying informed on industry trends and innovations, I regularly engaged with tech publications, blogs, and online courses, dedicating time each week to read articles and complete certifications. I also participated in industry conferences, webinars, and tech communities to exchange ideas and gain insights from experts. Additionally, I followed thought leaders on platforms like LinkedIn and Twitter, and actively experimented with new tools and technologies through personal projects. These efforts allowed me to stay updated on emerging trends and apply the latest practices to my work.
+@Service
+public class DiscardUploadedSOTService {
+
+    @Autowired
+    private RxSotGppDataDao rxSotGppDataDao;
+
+    @Autowired
+    private RXSOTProjectDetailDao rxSotProjectDetailDao;
+
+    @Autowired
+    private ProjectSOTDao projectSOTDao;
+
+    @Autowired
+    private SOTTerminatedUploadBackUpDao sotTerminatedUploadBackUpDao;
+
+    @Transactional
+    public String discardUploadedSOT(Long sotId, Long currentUserId) {
+        try {
+            // Step 1: Save data from RXSOTProjectDetail to SOTTerminatedUploadBackUp
+            RXSOTProjectDetail projectDetail = rxSotProjectDetailDao.findBySotId(sotId);
+            if (projectDetail != null) {
+                sotTerminatedUploadBackUpDao.save(projectDetail);
+            } else {
+                throw new Exception("No matching project detail found for sotId: " + sotId);
+            }
+
+            // Step 2: Delete record from RxSotGppData
+            RxSotGppData rxSotGppData = rxSotGppDataDao.findByUid(sotId);
+            if (rxSotGppData != null) {
+                rxSotGppDataDao.delete(rxSotGppData);
+            } else {
+                throw new Exception("No matching RxSotGppData found for sotId: " + sotId);
+            }
+
+            // Step 3: Delete record from ProjectSOT
+            ProjectSOT projectSOT = projectSOTDao.findBySotgppidMapping(sotId);
+            if (projectSOT != null) {
+                projectSOTDao.delete(projectSOT);
+            } else {
+                throw new Exception("No matching ProjectSOT found for sotId: " + sotId);
+            }
+
+            return "Successfully deleted data related to sotId: " + sotId;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error occurred while processing delete: " + e.getMessage());
+        }
+    }
+}
