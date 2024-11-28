@@ -1,80 +1,52 @@
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+if (search.getFromDate() != null || search.getToDate() != null) {
+    if (search.getFromDate() != null && search.getToDate() != null) {
+        cal.setTime(search.getToDate());
+        cal.add(Calendar.DATE, 1); // Adjust end of day
+        Date endOfDay = cal.getTime();
+        
+        // Filter for all project statuses
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.between(root.get("auditDate"), search.getFromDate(), endOfDay)
+        );
 
-import java.util.List;
+        // Add additional check for CLOSED projectStatus
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.or(
+                criteriaBuilder.notEqual(root.get("projectStatus"), "CLOSE"), // Apply only if not CLOSE
+                criteriaBuilder.between(root.get("closedStatusDateTime"), search.getFromDate(), endOfDay) // Additional filter for CLOSE
+            )
+        );
 
-@RestController
-@RequestMapping("/api")
-public class DiscardUploadedSOTController {
+    } else if (search.getFromDate() != null) {
+        // Filter for all project statuses
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.greaterThanOrEqualTo(root.get("auditDate"), search.getFromDate())
+        );
 
-    @Autowired
-    private DiscardUploadedSOTService discardUploadedSOTService;
+        // Add additional check for CLOSED projectStatus
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.or(
+                criteriaBuilder.notEqual(root.get("projectStatus"), "CLOSE"),
+                criteriaBuilder.greaterThanOrEqualTo(root.get("closedStatusDateTime"), search.getFromDate())
+            )
+        );
 
-    @DeleteMapping("/discardUploadedSOT")
-    public ResponseEntity<ResponseWrapper<String>> discardUploadedSOT(@RequestParam Long sotId, 
-                                                                      @RequestParam Long currentUserId) {
-        try {
-            String message = discardUploadedSOTService.discardUploadedSOT(sotId, currentUserId);
-            return ResponseEntity.ok(new ResponseWrapper<>(message, new ReqRes("Success", "Data deleted successfully")));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(new ResponseWrapper<>("Error occurred while deleting data", 
-                                                                      new ReqRes("Error", e.getMessage())));
-        }
-    }
-}
+    } else if (search.getToDate() != null) {
+        cal.setTime(search.getToDate());
+        cal.add(Calendar.DATE, 1); // Adjust end of day
+        Date endOfDay = cal.getTime();
+        
+        // Filter for all project statuses
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.lessThanOrEqualTo(root.get("auditDate"), endOfDay)
+        );
 
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-@Service
-public class DiscardUploadedSOTService {
-
-    @Autowired
-    private RxSotGppDataDao rxSotGppDataDao;
-
-    @Autowired
-    private RXSOTProjectDetailDao rxSotProjectDetailDao;
-
-    @Autowired
-    private ProjectSOTDao projectSOTDao;
-
-    @Autowired
-    private SOTTerminatedUploadBackUpDao sotTerminatedUploadBackUpDao;
-
-    @Transactional
-    public String discardUploadedSOT(Long sotId, Long currentUserId) {
-        try {
-            // Step 1: Save data from RXSOTProjectDetail to SOTTerminatedUploadBackUp
-            RXSOTProjectDetail projectDetail = rxSotProjectDetailDao.findBySotId(sotId);
-            if (projectDetail != null) {
-                sotTerminatedUploadBackUpDao.save(projectDetail);
-            } else {
-                throw new Exception("No matching project detail found for sotId: " + sotId);
-            }
-
-            // Step 2: Delete record from RxSotGppData
-            RxSotGppData rxSotGppData = rxSotGppDataDao.findByUid(sotId);
-            if (rxSotGppData != null) {
-                rxSotGppDataDao.delete(rxSotGppData);
-            } else {
-                throw new Exception("No matching RxSotGppData found for sotId: " + sotId);
-            }
-
-            // Step 3: Delete record from ProjectSOT
-            ProjectSOT projectSOT = projectSOTDao.findBySotgppidMapping(sotId);
-            if (projectSOT != null) {
-                projectSOTDao.delete(projectSOT);
-            } else {
-                throw new Exception("No matching ProjectSOT found for sotId: " + sotId);
-            }
-
-            return "Successfully deleted data related to sotId: " + sotId;
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error occurred while processing delete: " + e.getMessage());
-        }
+        // Add additional check for CLOSED projectStatus
+        spec = spec.and((root, query, criteriaBuilder) -> 
+            criteriaBuilder.or(
+                criteriaBuilder.notEqual(root.get("projectStatus"), "CLOSE"),
+                criteriaBuilder.lessThanOrEqualTo(root.get("closedStatusDateTime"), endOfDay)
+            )
+        );
     }
 }
