@@ -1,36 +1,67 @@
- // Location relationship
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "location_id") // Foreign key column in rx_user referencing rx_location
-    private Location location;
-	
-	
-	  public Location getLocation() {
-        return location;
+public class LocationDTO {
+    private Long locationId;
+    private String locationName;
+
+    public LocationDTO(Long locationId, String locationName) {
+        this.locationId = locationId;
+        this.locationName = locationName;
+    }
+}
+-------------------
+@Service
+public class LocationService {
+
+    private final LocationRepository locationRepository;
+
+    public LocationService(LocationRepository locationRepository) {
+        this.locationRepository = locationRepository;
     }
 
-    public void setLocation(Location location) {
-        this.location = location;
+    public List<LocationDTO> getAllLocations() {
+        // Fetch all locations from the database and map to simplified DTO
+        return locationRepository.findAll()
+                .stream()
+                .map(location -> new LocationDTO(
+                        location.getRxLocId(),
+                        location.getRxLocName()
+                ))
+                .collect(Collectors.toList());
     }
-	
-	
-	------------
-	
-	 @OneToMany(mappedBy = "location", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private Set<User> users = new HashSet<>();
-	
-	   public Set<User> getUsers() {
-        return users;
+}
+
+-------------------
+@RestController
+@RequestMapping("/api/locations")
+public class LocationController {
+
+    private final LocationService locationService;
+
+    public LocationController(LocationService locationService) {
+        this.locationService = locationService;
     }
 
-    public void setUsers(Set<User> users) {
-        this.users = users;
-    }
-	
-	------------------
-	 // Fetch Location entity using Location ID from frontend
-        Long locationId = userDTO.getLocationId();
-        Location location = locationRepository.findById(locationId)
-                .orElseThrow(() -> new RuntimeException("Location not found"));
+    @GetMapping
+    public ResponseEntity<ResponseWrapper<List<LocationDTO>>> getAllLocations() {
+        try {
+            // Fetch all locations from the service
+            List<LocationDTO> locations = locationService.getAllLocations();
 
-        // Set the Location entity in the User entity
-        user.setLocation(location);
+            // Prepare successful response
+            ResponseWrapper<List<LocationDTO>> response = new ResponseWrapper<>(
+                    locations,
+                    new ReqRes("00", "Success")
+            );
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            // Handle exceptions and prepare error response
+            ResponseWrapper<List<LocationDTO>> response = new ResponseWrapper<>(
+                    null,
+                    new ReqRes("99", "Failed to fetch locations: " + e.getMessage())
+            );
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+}
