@@ -1,126 +1,36 @@
-package com.optum.entity;
-
-import javax.persistence.*;
-import java.time.LocalDateTime;
-
-@Entity
-@Table(name = "rx_location")
-public class Location {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "rx_locid")
-    private Long locId;
-
-    @Column(name = "rx_loc_name", nullable = false, unique = true)
-    private String locationName;
-
-    @Column(name = "created_by", nullable = false)
-    private String createdBy;
-
-    @Column(name = "created_date_time", nullable = false)
-    private LocalDateTime createdDateTime;
-
-    @Column(name = "modified_date_time")
-    private LocalDateTime modifiedDateTime;
-
-    // Getters and Setters
-    public Long getLocId() {
-        return locId;
+ // Location relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id") // Foreign key column in rx_user referencing rx_location
+    private Location location;
+	
+	
+	  public Location getLocation() {
+        return location;
     }
 
-    public void setLocId(Long locId) {
-        this.locId = locId;
+    public void setLocation(Location location) {
+        this.location = location;
+    }
+	
+	
+	------------
+	
+	 @OneToMany(mappedBy = "location", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private Set<User> users = new HashSet<>();
+	
+	   public Set<User> getUsers() {
+        return users;
     }
 
-    public String getLocationName() {
-        return locationName;
+    public void setUsers(Set<User> users) {
+        this.users = users;
     }
+	
+	------------------
+	 // Fetch Location entity using Location ID from frontend
+        Long locationId = userDTO.getLocationId();
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new RuntimeException("Location not found"));
 
-    public void setLocationName(String locationName) {
-        this.locationName = locationName;
-    }
-
-    public String getCreatedBy() {
-        return createdBy;
-    }
-
-    public void setCreatedBy(String createdBy) {
-        this.createdBy = createdBy;
-    }
-
-    public LocalDateTime getCreatedDateTime() {
-        return createdDateTime;
-    }
-
-    public void setCreatedDateTime(LocalDateTime createdDateTime) {
-        this.createdDateTime = createdDateTime;
-    }
-
-    public LocalDateTime getModifiedDateTime() {
-        return modifiedDateTime;
-    }
-
-    public void setModifiedDateTime(LocalDateTime modifiedDateTime) {
-        this.modifiedDateTime = modifiedDateTime;
-    }
-}
-
-
-
-package com.optum.dao;
-
-import com.optum.entity.Location;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-@Repository
-public interface LocationDao extends JpaRepository<Location, Long> {
-    Location findByLocationName(String locationName);
-}
-
-
-
-package com.optum.configuration;
-
-import com.optum.dao.LocationDao;
-import com.optum.entity.Location;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.PostConstruct;
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-
-@Configuration
-@PropertySource({"classpath:application.properties", "classpath:location.properties"})
-public class LocationConfig {
-
-    private final LocationDao locationDao;
-
-    @Value("${location}")
-    private String location;
-
-    public LocationConfig(LocationDao locationDao) {
-        this.locationDao = locationDao;
-    }
-
-    @PostConstruct
-    @Transactional
-    public void init() {
-        List<String> locationNames = Arrays.asList(location.split(", "));
-        for (String locationName : locationNames) {
-            Location location = locationDao.findByLocationName(locationName);
-            if (location == null) {
-                location = new Location();
-                location.setLocationName(locationName);
-                location.setCreatedBy("SYSTEM"); // Default createdBy value
-                location.setCreatedDateTime(LocalDateTime.now());
-                locationDao.save(location);
-            }
-        }
-    }
-}
+        // Set the Location entity in the User entity
+        user.setLocation(location);
