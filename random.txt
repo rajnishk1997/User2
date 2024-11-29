@@ -1,52 +1,126 @@
-if (search.getFromDate() != null || search.getToDate() != null) {
-    if (search.getFromDate() != null && search.getToDate() != null) {
-        cal.setTime(search.getToDate());
-        cal.add(Calendar.DATE, 1); // Adjust end of day
-        Date endOfDay = cal.getTime();
-        
-        // Filter for all project statuses
-        spec = spec.and((root, query, criteriaBuilder) -> 
-            criteriaBuilder.between(root.get("auditDate"), search.getFromDate(), endOfDay)
-        );
+package com.optum.entity;
 
-        // Add additional check for CLOSED projectStatus
-        spec = spec.and((root, query, criteriaBuilder) -> 
-            criteriaBuilder.or(
-                criteriaBuilder.notEqual(root.get("projectStatus"), "CLOSE"), // Apply only if not CLOSE
-                criteriaBuilder.between(root.get("closedStatusDateTime"), search.getFromDate(), endOfDay) // Additional filter for CLOSE
-            )
-        );
+import javax.persistence.*;
+import java.time.LocalDateTime;
 
-    } else if (search.getFromDate() != null) {
-        // Filter for all project statuses
-        spec = spec.and((root, query, criteriaBuilder) -> 
-            criteriaBuilder.greaterThanOrEqualTo(root.get("auditDate"), search.getFromDate())
-        );
+@Entity
+@Table(name = "rx_location")
+public class Location {
 
-        // Add additional check for CLOSED projectStatus
-        spec = spec.and((root, query, criteriaBuilder) -> 
-            criteriaBuilder.or(
-                criteriaBuilder.notEqual(root.get("projectStatus"), "CLOSE"),
-                criteriaBuilder.greaterThanOrEqualTo(root.get("closedStatusDateTime"), search.getFromDate())
-            )
-        );
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "rx_locid")
+    private Long locId;
 
-    } else if (search.getToDate() != null) {
-        cal.setTime(search.getToDate());
-        cal.add(Calendar.DATE, 1); // Adjust end of day
-        Date endOfDay = cal.getTime();
-        
-        // Filter for all project statuses
-        spec = spec.and((root, query, criteriaBuilder) -> 
-            criteriaBuilder.lessThanOrEqualTo(root.get("auditDate"), endOfDay)
-        );
+    @Column(name = "rx_loc_name", nullable = false, unique = true)
+    private String locationName;
 
-        // Add additional check for CLOSED projectStatus
-        spec = spec.and((root, query, criteriaBuilder) -> 
-            criteriaBuilder.or(
-                criteriaBuilder.notEqual(root.get("projectStatus"), "CLOSE"),
-                criteriaBuilder.lessThanOrEqualTo(root.get("closedStatusDateTime"), endOfDay)
-            )
-        );
+    @Column(name = "created_by", nullable = false)
+    private String createdBy;
+
+    @Column(name = "created_date_time", nullable = false)
+    private LocalDateTime createdDateTime;
+
+    @Column(name = "modified_date_time")
+    private LocalDateTime modifiedDateTime;
+
+    // Getters and Setters
+    public Long getLocId() {
+        return locId;
+    }
+
+    public void setLocId(Long locId) {
+        this.locId = locId;
+    }
+
+    public String getLocationName() {
+        return locationName;
+    }
+
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public LocalDateTime getCreatedDateTime() {
+        return createdDateTime;
+    }
+
+    public void setCreatedDateTime(LocalDateTime createdDateTime) {
+        this.createdDateTime = createdDateTime;
+    }
+
+    public LocalDateTime getModifiedDateTime() {
+        return modifiedDateTime;
+    }
+
+    public void setModifiedDateTime(LocalDateTime modifiedDateTime) {
+        this.modifiedDateTime = modifiedDateTime;
+    }
+}
+
+
+
+package com.optum.dao;
+
+import com.optum.entity.Location;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface LocationDao extends JpaRepository<Location, Long> {
+    Location findByLocationName(String locationName);
+}
+
+
+
+package com.optum.configuration;
+
+import com.optum.dao.LocationDao;
+import com.optum.entity.Location;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.PostConstruct;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+@PropertySource({"classpath:application.properties", "classpath:location.properties"})
+public class LocationConfig {
+
+    private final LocationDao locationDao;
+
+    @Value("${location}")
+    private String location;
+
+    public LocationConfig(LocationDao locationDao) {
+        this.locationDao = locationDao;
+    }
+
+    @PostConstruct
+    @Transactional
+    public void init() {
+        List<String> locationNames = Arrays.asList(location.split(", "));
+        for (String locationName : locationNames) {
+            Location location = locationDao.findByLocationName(locationName);
+            if (location == null) {
+                location = new Location();
+                location.setLocationName(locationName);
+                location.setCreatedBy("SYSTEM"); // Default createdBy value
+                location.setCreatedDateTime(LocalDateTime.now());
+                locationDao.save(location);
+            }
+        }
     }
 }
