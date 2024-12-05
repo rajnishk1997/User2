@@ -1,67 +1,71 @@
-public class LocationDTO {
-    private Long locationId;
-    private String locationName;
-
-    public LocationDTO(Long locationId, String locationName) {
-        this.locationId = locationId;
-        this.locationName = locationName;
-    }
-}
--------------------
 @Service
-public class LocationService {
+public class ProjectTATService {
 
-    private final LocationRepository locationRepository;
+    @Autowired
+    private ProjectEventDetailsRepository eventDetailsRepository;
 
-    public LocationService(LocationRepository locationRepository) {
-        this.locationRepository = locationRepository;
-    }
+    @Autowired
+    private RXSOTProjectDetailRepository projectDetailRepository;
 
-    public List<LocationDTO> getAllLocations() {
-        // Fetch all locations from the database and map to simplified DTO
-        return locationRepository.findAll()
-                .stream()
-                .map(location -> new LocationDTO(
-                        location.getRxLocId(),
-                        location.getRxLocName()
-                ))
-                .collect(Collectors.toList());
-    }
-}
-
--------------------
-@RestController
-@RequestMapping("/api/locations")
-public class LocationController {
-
-    private final LocationService locationService;
-
-    public LocationController(LocationService locationService) {
-        this.locationService = locationService;
-    }
-
-    @GetMapping
-    public ResponseEntity<ResponseWrapper<List<LocationDTO>>> getAllLocations() {
-        try {
-            // Fetch all locations from the service
-            List<LocationDTO> locations = locationService.getAllLocations();
-
-            // Prepare successful response
-            ResponseWrapper<List<LocationDTO>> response = new ResponseWrapper<>(
-                    locations,
-                    new ReqRes("00", "Success")
-            );
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            // Handle exceptions and prepare error response
-            ResponseWrapper<List<LocationDTO>> response = new ResponseWrapper<>(
-                    null,
-                    new ReqRes("99", "Failed to fetch locations: " + e.getMessage())
-            );
-
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    public void calculateAndStoreTAT(Long sotId) {
+        // Fetch events for the project sorted by dateTime
+        List<ProjectEventDetails> events = eventDetailsRepository.findBySotIdOrderByDateTimeAsc(sotId);
+        if (events.isEmpty()) {
+            throw new IllegalStateException("No events found for SOT ID: " + sotId);
         }
+
+        Long totalTATMinutes = 0L;
+        Date startDateTime = null;
+
+        for (ProjectEventDetails event : events) {
+            if ("WIP".equals(event.getStatus())) {
+                // Start of a new iteration
+                if (startDateTime == null) {
+                    startDateTime = event.getDateTime();
+                }
+            } else {
+                // End of the current iteration
+                if (startDateTime != null) {
+                    Date endDateTime = event.getDateTime();
+                    totalTATMinutes += Duration.between(
+                            startDateTime.toInstant(), endDateTime.toInstant()
+                    ).toMinutes();
+                    startDateTime = null; // Reset for the next iteration
+                }
+            }
+        }
+
+        // If still in WIP, add duration until the current time
+        if (startDateTime != null) {
+            Date endDateTime = new Date(); // Current system time
+            totalTATMinutes += Duration.between(
+                    startDateTime.toInstant(), endDateTime.toInstant()
+            ).toMinutes();
+        }
+
+        // Store TAT in the project detail
+        RXSOTProjectDetail projectDetail = projectDetailRepository.findBySotId(sotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found for SOT ID: " + sotId));
+        projectDetail.setTatInMinutes(totalTATMinutes);
+        projectDetailRepository.save(projectDetail);
     }
 }
+
+
+------------------------------------------
+
+@Repository
+public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
+    List<ProjectEventDetails> findBySotIdOrderByDateTimeAsc(Long sotId);
+}
+
+@Repository
+public interface RXSOTProjectDetailRepository extends JpaRepository<RXSOTProjectDetail, Long> {
+    Optional<RXSOTProjectDetail> findBySotId(Long sotId);
+}
+
+
+
+-----------------
+  // Trigger TAT calculation for this SOT ID
+        projectTATService.calculateAndStoreTAT(request.getSotId());
