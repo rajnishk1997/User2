@@ -5,51 +5,66 @@ public class ProjectTATService {
     private ProjectEventDetailsRepository eventDetailsRepository;
 
     @Autowired
-    private RXSOTProjectDetailRepository projectDetailRepository;
+    private RXSOTProjectDetailRepository sotProjectDetailRepository;
 
-    public void calculateAndStoreTAT(Long sotId) {
-        // Fetch events for the project sorted by dateTime
-        List<ProjectEventDetails> events = eventDetailsRepository.findBySotIdOrderByDateTimeAsc(sotId);
-        if (events.isEmpty()) {
-            throw new IllegalStateException("No events found for SOT ID: " + sotId);
-        }
+    /**
+     * Calculates and stores the overall TAT for a given SOT ID.
+     * @param sotId The SOT ID for which TAT should be calculated.
+     */
+    public void calculateAndStoreOverallTAT(Long sotId) {
+        // Fetch all events for the given SOT ID, ordered by dateTime
+        List<ProjectEventDetails> events = eventDetailsRepository.findBySotIdOrderByDateTime(sotId);
+        
+        Date lastWipTime = null;
+        long totalTATInMinutes = 0;
 
-        Long totalTATMinutes = 0L;
-        Date startDateTime = null;
+        // Iterate through the events to calculate TAT for each WIP event
+        for (int i = 0; i < events.size(); i++) {
+            ProjectEventDetails event = events.get(i);
 
-        for (ProjectEventDetails event : events) {
-            if ("WIP".equals(event.getStatus())) {
-                // Start of a new iteration
-                if (startDateTime == null) {
-                    startDateTime = event.getDateTime();
+            // If the current event is a WIP, we need to calculate its TAT
+            if (event.getStatus().equals("WIP")) {
+                lastWipTime = event.getDateTime(); // Capture the last WIP time
+
+                // Try to find the next non-WIP event
+                Date nextEventTime = null;
+                for (int j = i + 1; j < events.size(); j++) {
+                    ProjectEventDetails nextEvent = events.get(j);
+
+                    if (!nextEvent.getStatus().equals("WIP")) {
+                        nextEventTime = nextEvent.getDateTime(); // Capture the time of the next non-WIP event
+                        break; // Exit after finding the first non-WIP event
+                    }
                 }
-            } else {
-                // End of the current iteration
-                if (startDateTime != null) {
-                    Date endDateTime = event.getDateTime();
-                    totalTATMinutes += Duration.between(
-                            startDateTime.toInstant(), endDateTime.toInstant()
-                    ).toMinutes();
-                    startDateTime = null; // Reset for the next iteration
+
+                // If no next event is found, use current system time as the end time
+                if (nextEventTime == null) {
+                    nextEventTime = new Date(); // Current system time if no non-WIP event
                 }
+
+                // Calculate the time difference between WIP and the next event (or system time)
+                long durationInMillis = nextEventTime.getTime() - lastWipTime.getTime();
+                long durationInMinutes = durationInMillis / (1000 * 60); // Convert to minutes
+
+                totalTATInMinutes += durationInMinutes; // Add to the total TAT
             }
         }
 
-        // If still in WIP, add duration until the current time
-        if (startDateTime != null) {
-            Date endDateTime = new Date(); // Current system time
-            totalTATMinutes += Duration.between(
-                    startDateTime.toInstant(), endDateTime.toInstant()
-            ).toMinutes();
-        }
+        // Convert total TAT in minutes to hours and minutes (hh:mm)
+        long totalHours = totalTATInMinutes / 60;
+        long totalMinutes = totalTATInMinutes % 60;
+        String formattedTAT = String.format("%02d:%02d", totalHours, totalMinutes);
 
-        // Store TAT in the project detail
-        RXSOTProjectDetail projectDetail = projectDetailRepository.findBySotId(sotId)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found for SOT ID: " + sotId));
-        projectDetail.setTatInMinutes(totalTATMinutes);
-        projectDetailRepository.save(projectDetail);
+        // Find the corresponding SOT project detail and store the total TAT
+        RXSOTProjectDetail projectDetail = sotProjectDetailRepository.findBySotId(sotId);
+        if (projectDetail != null) {
+            projectDetail.setTAT(formattedTAT); // Store the TAT in the new field
+            sotProjectDetailRepository.save(projectDetail); // Save the updated project detail
+        }
     }
 }
+
+
 
 
 ------------------------------------------
@@ -67,5 +82,5 @@ public interface RXSOTProjectDetailRepository extends JpaRepository<RXSOTProject
 
 
 -----------------
-  // Trigger TAT calculation for this SOT ID
-        projectTATService.calculateAndStoreTAT(request.getSotId());
+    // After logging the status, calculate and store the TAT
+        projectTATService.calculateAndStoreOverallTAT(request.getSotId());
