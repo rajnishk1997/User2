@@ -15,39 +15,31 @@ public class ProjectTATService {
         // Fetch all events for the given SOT ID, ordered by dateTime
         List<ProjectEventDetails> events = eventDetailsRepository.findBySotIdOrderByDateTime(sotId);
         
-        Date lastWipTime = null;
+        Date wipStartTime = null;
         long totalTATInMinutes = 0;
 
-        // Iterate through the events to calculate TAT for each WIP event
-        for (int i = 0; i < events.size(); i++) {
-            ProjectEventDetails event = events.get(i);
-
-            // If the current event is a WIP, we need to calculate its TAT
+        // Iterate through the events to calculate TAT for WIP periods
+        for (ProjectEventDetails event : events) {
             if (event.getStatus().equals("WIP")) {
-                lastWipTime = event.getDateTime(); // Capture the last WIP time
-
-                // Try to find the next non-WIP event
-                Date nextEventTime = null;
-                for (int j = i + 1; j < events.size(); j++) {
-                    ProjectEventDetails nextEvent = events.get(j);
-
-                    if (!nextEvent.getStatus().equals("WIP")) {
-                        nextEventTime = nextEvent.getDateTime(); // Capture the time of the next non-WIP event
-                        break; // Exit after finding the first non-WIP event
-                    }
+                // Start of a new WIP period
+                if (wipStartTime == null) {
+                    wipStartTime = event.getDateTime(); // Capture the start time
                 }
-
-                // If no next event is found, use current system time as the end time
-                if (nextEventTime == null) {
-                    nextEventTime = new Date(); // Current system time if no non-WIP event
+            } else {
+                // End of a WIP period
+                if (wipStartTime != null) {
+                    // Calculate the duration from WIP start to the current non-WIP event
+                    long durationInMillis = event.getDateTime().getTime() - wipStartTime.getTime();
+                    totalTATInMinutes += durationInMillis / (1000 * 60); // Convert to minutes
+                    wipStartTime = null; // Reset for the next WIP period
                 }
-
-                // Calculate the time difference between WIP and the next event (or system time)
-                long durationInMillis = nextEventTime.getTime() - lastWipTime.getTime();
-                long durationInMinutes = durationInMillis / (1000 * 60); // Convert to minutes
-
-                totalTATInMinutes += durationInMinutes; // Add to the total TAT
             }
+        }
+
+        // Handle case where the last event is still in WIP
+        if (wipStartTime != null) {
+            long durationInMillis = new Date().getTime() - wipStartTime.getTime();
+            totalTATInMinutes += durationInMillis / (1000 * 60); // Convert to minutes
         }
 
         // Convert total TAT in minutes to hours and minutes (hh:mm)
@@ -63,24 +55,3 @@ public class ProjectTATService {
         }
     }
 }
-
-
-
-
-------------------------------------------
-
-@Repository
-public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
-    List<ProjectEventDetails> findBySotIdOrderByDateTimeAsc(Long sotId);
-}
-
-@Repository
-public interface RXSOTProjectDetailRepository extends JpaRepository<RXSOTProjectDetail, Long> {
-    Optional<RXSOTProjectDetail> findBySotId(Long sotId);
-}
-
-
-
------------------
-    // After logging the status, calculate and store the TAT
-        projectTATService.calculateAndStoreOverallTAT(request.getSotId());
