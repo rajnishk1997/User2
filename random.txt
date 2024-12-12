@@ -11,10 +11,42 @@ public class ProjectTATService {
      * Calculates and stores the overall TAT for a given SOT ID.
      * @param sotId The SOT ID for which TAT should be calculated.
      */
-    public void calculateAndStoreOverallTAT(Long sotId) {
+    public void calculateAndStoreOverallTATForSotId(Long sotId) {
         // Fetch all events for the given SOT ID, ordered by dateTime
         List<ProjectEventDetails> events = eventDetailsRepository.findBySotIdOrderByDateTime(sotId);
-        
+
+        // Reuse the TAT calculation logic
+        String formattedTAT = calculateTAT(events);
+
+        // Find the corresponding SOT project detail and store the total TAT
+        storeTATForSotId(sotId, formattedTAT);
+    }
+
+    /**
+     * Calculates and stores the overall TAT for all records belonging to a given currentUserId.
+     * @param currentUserId The user ID for which TAT should be calculated across multiple SOT IDs.
+     */
+    public void calculateAndStoreOverallTATForUser(Long currentUserId) {
+        // Fetch all events for the given user ID, grouped by SOT ID
+        List<ProjectEventDetails> userEvents = eventDetailsRepository.findByCurrentUserIdOrderBySotIdAsc(currentUserId);
+
+        // Group events by SOT ID
+        Map<Long, List<ProjectEventDetails>> groupedEvents = userEvents.stream()
+            .collect(Collectors.groupingBy(ProjectEventDetails::getSotId));
+
+        // Iterate through each group and calculate/store TAT
+        groupedEvents.forEach((sotId, events) -> {
+            String formattedTAT = calculateTAT(events);
+            storeTATForSotId(sotId, formattedTAT);
+        });
+    }
+
+    /**
+     * Calculates the TAT based on a list of project events.
+     * @param events The list of project events to process.
+     * @return The formatted TAT string (hh:mm).
+     */
+    private String calculateTAT(List<ProjectEventDetails> events) {
         Date wipStartTime = null;
         long totalTATInMinutes = 0;
 
@@ -45,9 +77,15 @@ public class ProjectTATService {
         // Convert total TAT in minutes to hours and minutes (hh:mm)
         long totalHours = totalTATInMinutes / 60;
         long totalMinutes = totalTATInMinutes % 60;
-        String formattedTAT = String.format("%02d:%02d", totalHours, totalMinutes);
+        return String.format("%02d:%02d", totalHours, totalMinutes);
+    }
 
-        // Find the corresponding SOT project detail and store the total TAT
+    /**
+     * Stores the calculated TAT for a given SOT ID.
+     * @param sotId The SOT ID for which TAT should be stored.
+     * @param formattedTAT The formatted TAT string to store.
+     */
+    private void storeTATForSotId(Long sotId, String formattedTAT) {
         RXSOTProjectDetail projectDetail = sotProjectDetailRepository.findBySotId(sotId);
         if (projectDetail != null) {
             projectDetail.setTAT(formattedTAT); // Store the TAT in the new field
