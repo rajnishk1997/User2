@@ -29,11 +29,24 @@ public class ProjectTATService {
         Map<Long, List<ProjectEventDetails>> groupedEvents = events.stream()
             .collect(Collectors.groupingBy(ProjectEventDetails::getSotId));
 
-        // Iterate through each group and calculate/store TAT
-        groupedEvents.forEach((sotId, eventGroup) -> {
-            String formattedTAT = calculateTAT(eventGroup);
-            storeTATForSotId(sotId, formattedTAT);
-        });
+        // Iterate through each group and call the single sotId function
+        groupedEvents.keySet().forEach(this::calculateAndStoreTATForSotId);
+    }
+
+    /**
+     * Calculates and stores the TAT for a specific SOT ID.
+     *
+     * @param sotId The SOT ID for which TAT needs to be calculated and stored.
+     */
+    public void calculateAndStoreTATForSotId(Long sotId) {
+        // Fetch events for the specific SOT ID
+        List<ProjectEventDetails> eventsForSot = eventDetailsRepository.findBySotIdOrderByDateTimeAsc(sotId);
+
+        // Calculate TAT
+        String formattedTAT = calculateTAT(eventsForSot);
+
+        // Store the calculated TAT
+        storeTATForSotId(sotId, formattedTAT);
     }
 
     /**
@@ -89,20 +102,4 @@ public class ProjectTATService {
             sotProjectDetailRepository.save(projectDetail); // Save the updated project detail
         }
     }
-}
-
-
-
-List<ProjectEventDetails> findAllOrderBySotIdAsc();
-
-List<ProjectEventDetails> findByCurrentUserIdOrderBySotIdAsc(Long currentUserId);
-
-
-
-@Repository
-public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
-
-    List<ProjectEventDetails> findAllOrderBySotIdAsc();
-
-    List<ProjectEventDetails> findByCurrentUserIdOrderBySotIdAsc(Long currentUserId);
 }
