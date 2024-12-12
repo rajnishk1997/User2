@@ -1,105 +1,14 @@
-@Service
-public class ProjectTATService {
+public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
 
-    @Autowired
-    private ProjectEventDetailsRepository eventDetailsRepository;
+    // Fetch records by sotId and order by dateTime ascending
+    @Query("SELECT p FROM ProjectEventDetails p WHERE p.sotId = :sotId ORDER BY p.dateTime ASC")
+    List<ProjectEventDetails> findBySotIdOrderByDateTimeAsc(@Param("sotId") Long sotId);
 
-    @Autowired
-    private RXSOTProjectDetailRepository sotProjectDetailRepository;
+    // Fetch records by createdById and order by sotId ascending
+    @Query("SELECT p FROM ProjectEventDetails p WHERE p.createdbyId = :createdById ORDER BY p.sotId ASC")
+    List<ProjectEventDetails> findByCreatedByIdOrderBySotIdAsc(@Param("createdById") Integer createdById);
 
-    /**
-     * Calculates and stores the overall TAT for a given currentUserId.
-     * If currentUserId is 0, perform the TAT calculation for all records grouped by sotId.
-     * Otherwise, perform the TAT calculation for records belonging to the currentUserId, grouped by sotId.
-     *
-     * @param currentUserId The user ID for which TAT should be calculated (0 for all records).
-     */
-    public void calculateAndStoreOverallTAT(Long currentUserId) {
-        List<ProjectEventDetails> events;
-
-        if (currentUserId == 0) {
-            // Fetch all events when currentUserId is 0
-            events = eventDetailsRepository.findAllOrderBySotIdAsc();
-        } else {
-            // Fetch events for the given currentUserId
-            events = eventDetailsRepository.findByCurrentUserIdOrderBySotIdAsc(currentUserId);
-        }
-
-        // Group events by SOT ID
-        Map<Long, List<ProjectEventDetails>> groupedEvents = events.stream()
-            .collect(Collectors.groupingBy(ProjectEventDetails::getSotId));
-
-        // Iterate through each group and call the single sotId function
-        groupedEvents.keySet().forEach(this::calculateAndStoreTATForSotId);
-    }
-
-    /**
-     * Calculates and stores the TAT for a specific SOT ID.
-     *
-     * @param sotId The SOT ID for which TAT needs to be calculated and stored.
-     */
-    public void calculateAndStoreTATForSotId(Long sotId) {
-        // Fetch events for the specific SOT ID
-        List<ProjectEventDetails> eventsForSot = eventDetailsRepository.findBySotIdOrderByDateTimeAsc(sotId);
-
-        // Calculate TAT
-        String formattedTAT = calculateTAT(eventsForSot);
-
-        // Store the calculated TAT
-        storeTATForSotId(sotId, formattedTAT);
-    }
-
-    /**
-     * Calculates the TAT based on a list of project events.
-     *
-     * @param events The list of project events to process.
-     * @return The formatted TAT string (hh:mm).
-     */
-    private String calculateTAT(List<ProjectEventDetails> events) {
-        Date wipStartTime = null;
-        long totalTATInMinutes = 0;
-
-        // Iterate through the events to calculate TAT for WIP periods
-        for (ProjectEventDetails event : events) {
-            if (event.getStatus().equals("WIP")) {
-                // Start of a new WIP period
-                if (wipStartTime == null) {
-                    wipStartTime = event.getDateTime(); // Capture the start time
-                }
-            } else {
-                // End of a WIP period
-                if (wipStartTime != null) {
-                    // Calculate the duration from WIP start to the current non-WIP event
-                    long durationInMillis = event.getDateTime().getTime() - wipStartTime.getTime();
-                    totalTATInMinutes += durationInMillis / (1000 * 60); // Convert to minutes
-                    wipStartTime = null; // Reset for the next WIP period
-                }
-            }
-        }
-
-        // Handle case where the last event is still in WIP
-        if (wipStartTime != null) {
-            long durationInMillis = new Date().getTime() - wipStartTime.getTime();
-            totalTATInMinutes += durationInMillis / (1000 * 60); // Convert to minutes
-        }
-
-        // Convert total TAT in minutes to hours and minutes (hh:mm)
-        long totalHours = totalTATInMinutes / 60;
-        long totalMinutes = totalTATInMinutes % 60;
-        return String.format("%02d:%02d", totalHours, totalMinutes);
-    }
-
-    /**
-     * Stores the calculated TAT for a given SOT ID.
-     *
-     * @param sotId       The SOT ID for which TAT should be stored.
-     * @param formattedTAT The formatted TAT string to store.
-     */
-    private void storeTATForSotId(Long sotId, String formattedTAT) {
-        RXSOTProjectDetail projectDetail = sotProjectDetailRepository.findBySotId(sotId);
-        if (projectDetail != null) {
-            projectDetail.setTAT(formattedTAT); // Store the TAT in the new field
-            sotProjectDetailRepository.save(projectDetail); // Save the updated project detail
-        }
-    }
+    // Fetch all records ordered by sotId ascending
+    @Query("SELECT p FROM ProjectEventDetails p ORDER BY p.sotId ASC")
+    List<ProjectEventDetails> findAllByOrderBySotIdAsc();
 }
