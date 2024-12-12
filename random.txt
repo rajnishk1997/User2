@@ -8,41 +8,37 @@ public class ProjectTATService {
     private RXSOTProjectDetailRepository sotProjectDetailRepository;
 
     /**
-     * Calculates and stores the overall TAT for a given SOT ID.
-     * @param sotId The SOT ID for which TAT should be calculated.
+     * Calculates and stores the overall TAT for a given currentUserId.
+     * If currentUserId is 0, perform the TAT calculation for all records grouped by sotId.
+     * Otherwise, perform the TAT calculation for records belonging to the currentUserId, grouped by sotId.
+     *
+     * @param currentUserId The user ID for which TAT should be calculated (0 for all records).
      */
-    public void calculateAndStoreOverallTATForSotId(Long sotId) {
-        // Fetch all events for the given SOT ID, ordered by dateTime
-        List<ProjectEventDetails> events = eventDetailsRepository.findBySotIdOrderByDateTime(sotId);
+    public void calculateAndStoreOverallTAT(Long currentUserId) {
+        List<ProjectEventDetails> events;
 
-        // Reuse the TAT calculation logic
-        String formattedTAT = calculateTAT(events);
-
-        // Find the corresponding SOT project detail and store the total TAT
-        storeTATForSotId(sotId, formattedTAT);
-    }
-
-    /**
-     * Calculates and stores the overall TAT for all records belonging to a given currentUserId.
-     * @param currentUserId The user ID for which TAT should be calculated across multiple SOT IDs.
-     */
-    public void calculateAndStoreOverallTATForUser(Long currentUserId) {
-        // Fetch all events for the given user ID, grouped by SOT ID
-        List<ProjectEventDetails> userEvents = eventDetailsRepository.findByCurrentUserIdOrderBySotIdAsc(currentUserId);
+        if (currentUserId == 0) {
+            // Fetch all events when currentUserId is 0
+            events = eventDetailsRepository.findAllOrderBySotIdAsc();
+        } else {
+            // Fetch events for the given currentUserId
+            events = eventDetailsRepository.findByCurrentUserIdOrderBySotIdAsc(currentUserId);
+        }
 
         // Group events by SOT ID
-        Map<Long, List<ProjectEventDetails>> groupedEvents = userEvents.stream()
+        Map<Long, List<ProjectEventDetails>> groupedEvents = events.stream()
             .collect(Collectors.groupingBy(ProjectEventDetails::getSotId));
 
         // Iterate through each group and calculate/store TAT
-        groupedEvents.forEach((sotId, events) -> {
-            String formattedTAT = calculateTAT(events);
+        groupedEvents.forEach((sotId, eventGroup) -> {
+            String formattedTAT = calculateTAT(eventGroup);
             storeTATForSotId(sotId, formattedTAT);
         });
     }
 
     /**
      * Calculates the TAT based on a list of project events.
+     *
      * @param events The list of project events to process.
      * @return The formatted TAT string (hh:mm).
      */
@@ -82,7 +78,8 @@ public class ProjectTATService {
 
     /**
      * Stores the calculated TAT for a given SOT ID.
-     * @param sotId The SOT ID for which TAT should be stored.
+     *
+     * @param sotId       The SOT ID for which TAT should be stored.
      * @param formattedTAT The formatted TAT string to store.
      */
     private void storeTATForSotId(Long sotId, String formattedTAT) {
@@ -92,4 +89,20 @@ public class ProjectTATService {
             sotProjectDetailRepository.save(projectDetail); // Save the updated project detail
         }
     }
+}
+
+
+
+List<ProjectEventDetails> findAllOrderBySotIdAsc();
+
+List<ProjectEventDetails> findByCurrentUserIdOrderBySotIdAsc(Long currentUserId);
+
+
+
+@Repository
+public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
+
+    List<ProjectEventDetails> findAllOrderBySotIdAsc();
+
+    List<ProjectEventDetails> findByCurrentUserIdOrderBySotIdAsc(Long currentUserId);
 }
