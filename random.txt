@@ -1,14 +1,101 @@
-public interface ProjectEventDetailsRepository extends JpaRepository<ProjectEventDetails, Long> {
+public class ValidateJsonDTO {
+    // Existing fields...
 
-    // Fetch records by sotId and order by dateTime ascending
-    @Query("SELECT p FROM ProjectEventDetails p WHERE p.sotId = :sotId ORDER BY p.dateTime ASC")
-    List<ProjectEventDetails> findBySotIdOrderByDateTimeAsc(@Param("sotId") Long sotId);
+    private Map<String, String> networkInfoList; // Key = NTWK_ID, Value = blank string
 
-    // Fetch records by createdById and order by sotId ascending
-    @Query("SELECT p FROM ProjectEventDetails p WHERE p.createdbyId = :createdById ORDER BY p.sotId ASC")
-    List<ProjectEventDetails> findByCreatedByIdOrderBySotIdAsc(@Param("createdById") Integer createdById);
+    // Getter and Setter
+    public Map<String, String> getNetworkInfoList() {
+        return networkInfoList;
+    }
 
-    // Fetch all records ordered by sotId ascending
-    @Query("SELECT p FROM ProjectEventDetails p ORDER BY p.sotId ASC")
-    List<ProjectEventDetails> findAllByOrderBySotIdAsc();
+    public void setNetworkInfoList(Map<String, String> networkInfoList) {
+        this.networkInfoList = networkInfoList;
+    }
+}
+
+
+
+@Repository
+public interface NetworkMappingRepository extends JpaRepository<NetworkMappingEntity, Long> {
+
+    @Query("SELECT COUNT(n) FROM NetworkMappingEntity n WHERE n.gppNetworkName = :networkName")
+    long countByGppNetworkName(@Param("networkName") String networkName);
+}
+
+
+@Autowired
+private NetworkMappingRepository networkMappingRepository;
+
+public ValidateJsonDTO performPreValidation(String gppJson4) {
+    ValidateJsonDTO validateJsonDTO = new ValidateJsonDTO();
+    Map<String, String> invalidNetworkInfo = new HashMap<>();
+
+    try {
+        // Parse gpp_json4
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode rootNode = objectMapper.readTree(gppJson4);
+        
+        if (rootNode.isArray()) {
+            for (JsonNode node : rootNode) {
+                String networkId = node.path("NTWK_ID").asText().trim();
+
+                // Validate NTWK_ID using repository
+                long count = networkMappingRepository.countByGppNetworkName(networkId);
+                if (count == 0) {
+                    invalidNetworkInfo.put(networkId, ""); // Add to list if not found
+                }
+            }
+        }
+
+        // If invalid keys are found, stop further execution
+        if (!invalidNetworkInfo.isEmpty()) {
+            validateJsonDTO.setNetworkInfo(invalidNetworkInfo);
+            return validateJsonDTO; // Return DTO to frontend
+        }
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        throw new RuntimeException("Error during network info validation");
+    }
+    return null; // Return null if everything is valid
+}
+
+
+
+@Repository
+public interface SotGppDataRepository extends JpaRepository<SotGppDataEntity, Long> {
+
+    @Query(value = "SELECT g.gpp_json4 FROM rx_sot_gpp_data g WHERE g.uid = :uid", nativeQuery = true)
+    String fetchGppJson4ByUid(@Param("uid") String uid);
+}
+
+
+
+@PostMapping("/validateGppJson")
+public ResponseEntity<ValidateJsonDTO> validateGppJson(@RequestParam String uid) {
+    ValidateJsonDTO validateJsonDTO = new ValidateJsonDTO();
+
+    try {
+        // Fetch gpp_json4 from database
+        String gppJson4 = sotGppDataRepository.fetchGppJson4ByUid(uid);
+
+        // Pre-validation step for NTWK_ID
+        validateJsonDTO = validationService.performPreValidation(gppJson4);
+        if (validateJsonDTO != null && validateJsonDTO.getNetworkInfo() != null) {
+            // Return invalid NTWK_IDs to frontend
+            return ResponseEntity.ok(validateJsonDTO);
+        }
+
+        // Proceed with other validations if NTWK_ID is valid
+        validationService.performGpp4Validation(gppJson4); // Assuming you already have this method
+        validationService.performGpp10Validation(uid);
+        validationService.performGpp28Validation(uid);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                             .body(null);
+    }
+
+    return ResponseEntity.ok(validateJsonDTO);
 }
