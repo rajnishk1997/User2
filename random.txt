@@ -1,146 +1,49 @@
-import java.util.List;
-import java.util.Map;
+Fetch JSON Data:
 
-public class BulkNetworkMasterDTO {
-    private List<Map<String, String>> mappedNetworks;
-    private String platformName;
-    private int currentUserId;
+Retrieve gppJson28Str and planCodeOverrideStr using DAOs.
+Parse JSON Strings:
 
-    public List<Map<String, String>> getMappedNetworks() {
-        return mappedNetworks;
-    }
+Convert gppJson28Str and planCodeOverrideStr into List<Map<String, Object>> using parseJson.
+Extract Distinct Values:
 
-    public void setMappedNetworks(List<Map<String, String>> mappedNetworks) {
-        this.mappedNetworks = mappedNetworks;
-    }
+Extract distinct 00001 values from planCodeOverrideList into a Set<String>.
+Filter Data:
 
-    public String getPlatformName() {
-        return platformName;
-    }
+Filter the gppJson28List based on specific criteria using filterByG.
+Compare Pairs:
 
-    public void setPlatformName(String platformName) {
-        this.platformName = platformName;
-    }
+Call comparePairs with the filtered list, distinct values, and additional parameters to perform further validations.
 
-    public int getCurrentUserId() {
-        return currentUserId;
-    }
+Here are the steps of the findPair method:
 
-    public void setCurrentUserId(int currentUserId) {
-        this.currentUserId = currentUserId;
-    }
-}
+Remove Whitespace:
 
+Strip all spaces from the input string adaaecdValue.
+Step (i):
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+Replace the last occurrence of "R" with "S".
+Check if the transformed string matches any entry in the filteredList.
+Step (ii):
 
-@RestController
-@RequestMapping("/api/networkMaster")
-public class SOTNetworkMasterController {
+Replace the second-last occurrence of "R" with "S".
+Check if the transformed string matches any entry in the filteredList.
+Step (iii):
 
-    @Autowired
-    private SOTNetworkMasterService sotNetworkMasterService;
+Replace the last occurrence of "RT" with "SP".
+Check if the transformed string matches any entry in the filteredList.
+Step (iv):
 
-    @PostMapping("/bulkSaveNetworkMaster")
-    public ResponseEntity<ReqRes> bulkSaveNetworkMaster(@RequestBody BulkNetworkMasterDTO requestDTO) {
-        try {
-            sotNetworkMasterService.saveBulkNetworkMaster(requestDTO);
+If the string ends with "RT" followed by a digit (e.g., "RT1"), replace it with "SP" followed by the same digit (e.g., "SP1").
+Check if the transformed string matches any entry in the filteredList.
+Step (v):
 
-            ReqRes response = new ReqRes(200, null, "Bulk Network Master data saved successfully");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            e.printStackTrace();
-            ReqRes errorResponse = new ReqRes(500, "Internal Server Error", "An error occurred while saving!");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
-}
+If no matches are found in previous steps, append "SP" to the input string.
+Check if the transformed string matches any entry in the filteredList.
+Step (vi):
 
+If still no matches are found, append "S" to the input string.
+Check if the transformed string matches any entry in the filteredList.
+Return Result:
 
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.Map;
-
-@Service
-public class SOTNetworkMasterService {
-
-    @Autowired
-    private SOTNetworkMasterRepository sotNetworkMasterRepository;
-
-    @Autowired
-    private SPlatformRepository sPlatformRepository;
-
-    public void saveBulkNetworkMaster(BulkNetworkMasterDTO requestDTO) {
-        // Fetch SPlatform entity using platformName
-        SPlatform platform = sPlatformRepository.findByPlatformName(requestDTO.getPlatformName());
-
-        if (platform == null) {
-            throw new RuntimeException("Invalid platform name: " + requestDTO.getPlatformName());
-        }
-
-        // Iterate over mappedNetworks array and save each record
-        for (Map<String, String> network : requestDTO.getMappedNetworks()) {
-            SOTNetworkMaster networkMaster = new SOTNetworkMaster();
-            networkMaster.setSotNetworkName(network.get("0")); // Map '0' to sotNetworkName
-            networkMaster.setGppNetworkName(network.get("1")); // Map '1' to gppNetworkName
-            networkMaster.setPlatform(platform);              // Set ManyToOne relationship
-            networkMaster.setCreatedBy(requestDTO.getCurrentUserId());
-
-            // Save entity
-            sotNetworkMasterRepository.save(networkMaster);
-        }
-    }
-}
-
-
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import com.optum.entity.SOTNetworkMaster;
-
-public interface SOTNetworkMasterRepository extends JpaRepository<SOTNetworkMaster, Integer> {
-}
-
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import com.optum.entity.SPlatform;
-
-public interface SPlatformRepository extends JpaRepository<SPlatform, Integer> {
-    SPlatform findByPlatformName(String platformName);
-}
-
-
-
-{
-  "mappedNetworks": [
-    {
-      "0": "BHSGEN",
-      "1": "BHSGEN"
-    },
-    {
-      "0": "Optum Mail Networks, if Present",
-      "1": "OptumL"
-    },
-    {
-      "0": "Optum Mail Networks",
-      "1": "SALVECO"
-    },
-    {
-      "0": "Optum Mail Network",
-      "1": "OptumLM"
-    },
-    {
-      "0": "Optum Mail",
-      "1": "OptumLYY"
-    }
-  ],
-  "platformName": "A6",
-  "currentUserId": 37
-}
+If a match is found at any step, return the corresponding object (GppJson28Field).
+If no matches are found after all steps, return null.
