@@ -1,11 +1,49 @@
-sotnetworkmaster:
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.stream.Collectors;
 
-    @ManyToOne
-    @JoinColumn(name = "network_id_type_id", referencedColumnName = "nm_rid")
-    private NetworkIdTypeForNetworkMaster networkIdType;
-	
-@OneToMany(mappedBy = "networkIdType", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<SOTNetworkMaster> sotNetworkMasters;
-	
-	NetworkIdTypeForNetworkMaster networkType = entityManager.find(NetworkIdTypeForNetworkMaster.class, 1);
-List<SOTNetworkMaster> linkedNetworks = networkType.getSotNetworkMasters();
+@Service
+public class NetworkIdTypeService {
+
+    @Autowired
+    private NetworkIdTypeForNetworkMasterRepository repository;
+
+    public ResponseWrapper<List<NetworkIdTypeDTO>> getAllNetworkTypes() {
+        try {
+            List<NetworkIdTypeDTO> dtoList = repository.findAll().stream()
+                    .map(networkType -> new NetworkIdTypeDTO(
+                            networkType.getNetworkIdTypeRid(),
+                            networkType.getNetworkIdTypeName()))
+                    .collect(Collectors.toList());
+
+            ReqRes response = new ReqRes(200, null, "Data fetched successfully");
+            return new ResponseWrapper<>(dtoList, response);
+        } catch (Exception e) {
+            ReqRes errorResponse = new ReqRes(500, e.getMessage(), "Failed to fetch data");
+            return new ResponseWrapper<>(null, errorResponse);
+        }
+    }
+}
+
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/network-types")
+public class NetworkIdTypeController {
+
+    @Autowired
+    private NetworkIdTypeService networkIdTypeService;
+
+    @GetMapping
+    public ResponseEntity<ResponseWrapper<List<NetworkIdTypeDTO>>> getAllNetworkTypes() {
+        ResponseWrapper<List<NetworkIdTypeDTO>> response = networkIdTypeService.getAllNetworkTypes();
+        return ResponseEntity.status(response.getReqRes().getStatusCode()).body(response);
+    }
+}
