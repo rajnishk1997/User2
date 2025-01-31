@@ -1,49 +1,51 @@
-Fetch JSON Data:
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Map;
 
-Retrieve gppJson28Str and planCodeOverrideStr using DAOs.
-Parse JSON Strings:
+public class SwaggerToExcel {
+    public static void main(String[] args) throws Exception {
+        // Fetch the Swagger JSON from the endpoint
+        URL url = new URL("http://localhost:8080/v2/api-docs");
+        InputStream inputStream = url.openStream();
+        
+        // Parse the Swagger JSON
+        ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, Object> swagger = objectMapper.readValue(inputStream, Map.class);
+        
+        // Create a new workbook and sheet
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("API Endpoints");
+        
+        // Create headers for the Excel file
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("API Path");
+        headerRow.createCell(1).setCellValue("Method");
+        headerRow.createCell(2).setCellValue("Description");
 
-Convert gppJson28Str and planCodeOverrideStr into List<Map<String, Object>> using parseJson.
-Extract Distinct Values:
+        // Extract API details from the Swagger JSON and populate the Excel
+        int rowNum = 1;
+        Map<String, Map<String, Object>> paths = (Map<String, Map<String, Object>>) swagger.get("paths");
+        
+        for (String path : paths.keySet()) {
+            Map<String, Object> methods = paths.get(path);
+            
+            for (String method : methods.keySet()) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(path);
+                row.createCell(1).setCellValue(method.toUpperCase());
+                row.createCell(2).setCellValue(methods.get("description") != null ? methods.get("description").toString() : "");
+            }
+        }
 
-Extract distinct 00001 values from planCodeOverrideList into a Set<String>.
-Filter Data:
+        // Write the Excel file to disk
+        try (FileOutputStream fileOut = new FileOutputStream("swagger_api_endpoints.xlsx")) {
+            workbook.write(fileOut);
+        }
 
-Filter the gppJson28List based on specific criteria using filterByG.
-Compare Pairs:
-
-Call comparePairs with the filtered list, distinct values, and additional parameters to perform further validations.
-
-Here are the steps of the findPair method:
-
-Remove Whitespace:
-
-Strip all spaces from the input string adaaecdValue.
-Step (i):
-
-Replace the last occurrence of "R" with "S".
-Check if the transformed string matches any entry in the filteredList.
-Step (ii):
-
-Replace the second-last occurrence of "R" with "S".
-Check if the transformed string matches any entry in the filteredList.
-Step (iii):
-
-Replace the last occurrence of "RT" with "SP".
-Check if the transformed string matches any entry in the filteredList.
-Step (iv):
-
-If the string ends with "RT" followed by a digit (e.g., "RT1"), replace it with "SP" followed by the same digit (e.g., "SP1").
-Check if the transformed string matches any entry in the filteredList.
-Step (v):
-
-If no matches are found in previous steps, append "SP" to the input string.
-Check if the transformed string matches any entry in the filteredList.
-Step (vi):
-
-If still no matches are found, append "S" to the input string.
-Check if the transformed string matches any entry in the filteredList.
-Return Result:
-
-If a match is found at any step, return the corresponding object (GppJson28Field).
-If no matches are found after all steps, return null.
+        workbook.close();
+    }
+}
