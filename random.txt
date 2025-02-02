@@ -1,49 +1,256 @@
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
-import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-public class NetworkIdTypeService {
+public class GppJson28Service {
 
-    @Autowired
-    private NetworkIdTypeForNetworkMasterRepository repository;
+    private final SOTNetworkMasterRepository sotNetworkMasterRepository;
+    private final GppJson28Dao gppJson28Dao;
 
-    public ResponseWrapper<List<NetworkIdTypeDTO>> getAllNetworkTypes() {
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    public GppJson28Service(SOTNetworkMasterRepository sotNetworkMasterRepository,
+                            GppJson28Dao gppJson28Dao) {
+        this.sotNetworkMasterRepository = sotNetworkMasterRepository;
+        this.gppJson28Dao = gppJson28Dao;
+    }
+
+    public List<GppJson28FieldValidationResponse> getGppJson28ByUid(Long uid, Integer currentUserId, String projectName) {
+
+        List<GppJson28FieldValidationResponse> responses = new ArrayList<>();
+
+        // ===================== STEP 1 =====================
+        // Fetch SOTNetworkMaster rows with networkIdTypeRid = 3 and extract unique gppNetworkName values.
+        List<SOTNetworkMaster> sotList = sotNetworkMasterRepository.findByNetworkIdType_NetworkIdTypeRid(3);
+        Set<String> uniqueGppNetworkNames = sotList.stream()
+                .map(SOTNetworkMaster::getGppNetworkName)
+                .collect(Collectors.toSet());
+        // For example, the set should contain "ASCEND" and "COVID".
+
+        // Process each network name separately
+        for (String networkName : uniqueGppNetworkNames) {
+            GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
+            response.setGppJson28Message(""); // initialize message
+
+            try {
+                // ===================== STEP 2 =====================
+                // Query to fetch the primary JSON data for this uid.
+                Query query = entityManager.createNativeQuery("SELECT gpp_json4 FROM rxcl_audit.rx_sot_gpp_data WHERE uid = " + uid);
+                List<Object[]> resultList = query.getResultList();
+                if (resultList.isEmpty()) {
+                    throw new RuntimeException("Data not found for uid " + uid);
+                }
+                Object[] jsonData = resultList.get(0);
+                String gppJson = (String) jsonData[0];
+
+                // Parse the primary JSON into a list of maps.
+                List<Map<String, Object>> gppJsonObjects = parseJson(gppJson);
+
+                // Filter the objects for the current network name (e.g. "ASCEND" or "COVID")
+                List<Map<String, Object>> filteredByNetwork = gppJsonObjects.stream()
+                        .filter(map -> networkName.equalsIgnoreCase(String.valueOf(map.get("NTWK_ID"))))
+                        .collect(Collectors.toList());
+
+                // ===================== STEP 3 =====================
+                // Filter out objects with blank "OR_PLAN_CODE"
+                List<Map<String, Object>> nonBlankPlan = filteredByNetwork.stream()
+                        .filter(map -> {
+                            Object orPlan = map.get("OR_PLAN_CODE");
+                            return orPlan != null && !String.valueOf(orPlan).trim().isEmpty();
+                        })
+                        .collect(Collectors.toList());
+
+                // ===================== STEP 4 =====================
+                // Group by the unique combination of PLAN_CODE and OR_PLAN_CODE.
+                // The key is built as "PLAN_CODE_OR_PLAN_CODE" (trimmed).
+                Map<String, Map<String, Object>> uniquePlanPairs = nonBlankPlan.stream()
+                        .collect(Collectors.toMap(
+                                map -> String.valueOf(map.get("PLAN_CODE")).trim() + "_" + String.valueOf(map.get("OR_PLAN_CODE")).trim(),
+                                map -> map,
+                                (existing, replacement) -> existing  // in case of duplicate, keep one.
+                        ));
+
+                if (uniquePlanPairs.isEmpty()) {
+                    response.setGppJson28Message("No Retail Plan Code Found");
+                }
+
+                // ===================== STEP 5 =====================
+                // Fetch the secondary JSON string from the DAO and parse it.
+                String gppJson28Str = gppJson28Dao.findGppJson28ByUid(uid);
+                List<Map<String, Object>> gppJson28List = parseJson(gppJson28Str);
+
+                // ===================== STEP 5.1 =====================
+                if ("No Retail Plan Code Found".equals(response.getGppJson28Message())) {
+                    response.setGppJson28Match(0);
+                    response.setBATToReview(gppJson28List.size());
+                    response.setGppJson28NotMatch(0);
+                    response.setGppJson28Fields(Collections.emptyList());
+                    responses.add(response);
+                    continue; // move to next network name
+                }
+
+                // ===================== STEP 5.2 =====================
+                // Filter the gppJson28List for objects where F = "Y" and G = "02"
+                List<Map<String, Object>> filteredGpp28 = gppJson28List.stream()
+                        .filter(map -> "Y".equalsIgnoreCase(String.valueOf(map.get("F")).trim())
+                                && "02".equalsIgnoreCase(String.valueOf(map.get("G")).trim()))
+                        .collect(Collectors.toList());
+                if (filteredGpp28.isEmpty()) {
+                    response.setGppJson28Message("No combination of Opt 28 =Y and Price Opt# = 02 found");
+                    response.setGppJson28Match(0);
+                    response.setBATToReview(gppJson28List.size());
+                    response.setGppJson28NotMatch(0);
+                    response.setGppJson28Fields(Collections.emptyList());
+                    responses.add(response);
+                    continue;
+                }
+
+                // ===================== STEP 6 to 8 (Modified) =====================
+                // Process each unique retail plan pair and produce two GppJson28Field objects (for R and S)
+                List<GppJson28Field> fieldResults = new ArrayList<>();
+
+                for (Map.Entry<String, Map<String, Object>> entry : uniquePlanPairs.entrySet()) {
+                    // Retrieve the pair values.
+                    String planCode = String.valueOf(entry.getValue().get("PLAN_CODE")).trim();    // e.g. "EDHLTP04 R"
+                    String orPlanCode = String.valueOf(entry.getValue().get("OR_PLAN_CODE")).trim(); // e.g. "EDHLTP04 S"
+
+                    // Get matching objects from filteredGpp28 for each side using the ADAECD field.
+                    List<Map<String, Object>> planData = filteredGpp28.stream()
+                            .filter(map -> planCode.equalsIgnoreCase(String.valueOf(map.get("ADAECD")).trim()))
+                            .collect(Collectors.toList());
+                    List<Map<String, Object>> orPlanData = filteredGpp28.stream()
+                            .filter(map -> orPlanCode.equalsIgnoreCase(String.valueOf(map.get("ADAECD")).trim()))
+                            .collect(Collectors.toList());
+
+                    // If either side is missing, record a no-pair result.
+                    if (planData.isEmpty() || orPlanData.isEmpty()) {
+                        GppJson28Field field = new GppJson28Field();
+                        field.setFAILEDVALIDATION("No Pair found");
+                        fieldResults.add(field);
+                        continue;
+                    }
+
+                    // Pick one representative for each.
+                    Map<String, Object> planObj = planData.get(0);
+                    Map<String, Object> orPlanObj = orPlanData.get(0);
+
+                    // ===================== STEP 7 =====================
+                    // Validate the "I" date field for both objects.
+                    String planDateStr = String.valueOf(planObj.get("I")).trim();
+                    String orPlanDateStr = String.valueOf(orPlanObj.get("I")).trim();
+                    boolean planActive = isActiveDate(planDateStr);
+                    boolean orPlanActive = isActiveDate(orPlanDateStr);
+                    if (!planActive || !orPlanActive) {
+                        GppJson28Field field = new GppJson28Field();
+                        field.setFAILEDVALIDATION("Non-active date");
+                        fieldResults.add(field);
+                        continue;
+                    }
+
+                    // ===================== STEP 8 =====================
+                    // Compare the "K" field values.
+                    String planK = String.valueOf(planObj.get("K")).trim();
+                    String orPlanK = String.valueOf(orPlanObj.get("K")).trim();
+                    String validationResult = planK.equals(orPlanK) ? "Match" : "Not Match";
+
+                    // Create two separate GppJson28Field objects:
+                    GppJson28Field fieldR = new GppJson28Field();
+                    fieldR.setADA1DT(String.valueOf(planObj.get("ADA1DT")));
+                    fieldR.setF(String.valueOf(planObj.get("F")));
+                    fieldR.setG(String.valueOf(planObj.get("G")));
+                    fieldR.setH(String.valueOf(planObj.get("H")));
+                    fieldR.setI(planDateStr);
+                    fieldR.setADAKDT(String.valueOf(planObj.get("ADAKDT")));
+                    fieldR.setJ(String.valueOf(planObj.get("J")));
+                    fieldR.setK(planK);
+                    fieldR.setADBOTX(String.valueOf(planObj.get("ADBOTX")));
+                    fieldR.setL(String.valueOf(planObj.get("L")));
+                    fieldR.setADAECD(String.valueOf(planObj.get("ADAECD"))); // e.g., "EDHLTP04 R"
+                    fieldR.setFAILEDVALIDATION(validationResult);
+
+                    GppJson28Field fieldS = new GppJson28Field();
+                    fieldS.setADA1DT(String.valueOf(orPlanObj.get("ADA1DT")));
+                    fieldS.setF(String.valueOf(orPlanObj.get("F")));
+                    fieldS.setG(String.valueOf(orPlanObj.get("G")));
+                    fieldS.setH(String.valueOf(orPlanObj.get("H")));
+                    fieldS.setI(orPlanDateStr);
+                    fieldS.setADAKDT(String.valueOf(orPlanObj.get("ADAKDT")));
+                    fieldS.setJ(String.valueOf(orPlanObj.get("J")));
+                    fieldS.setK(orPlanK);
+                    fieldS.setADBOTX(String.valueOf(orPlanObj.get("ADBOTX")));
+                    fieldS.setL(String.valueOf(orPlanObj.get("L")));
+                    fieldS.setADAECD(String.valueOf(orPlanObj.get("ADAECD"))); // e.g., "EDHLTP04 S"
+                    fieldS.setFAILEDVALIDATION(validationResult);
+
+                    // Add both objects to the result list.
+                    fieldResults.add(fieldR);
+                    fieldResults.add(fieldS);
+                }
+
+                // Count matches vs. not matches from the processed fields.
+                long matchCount = fieldResults.stream()
+                        .filter(f -> "Match".equalsIgnoreCase(f.getFAILEDVALIDATION()))
+                        .count();
+                long notMatchCount = fieldResults.stream()
+                        .filter(f -> "Not Match".equalsIgnoreCase(f.getFAILEDVALIDATION()))
+                        .count();
+                response.setGppJson28Match((int) matchCount);
+                response.setGppJson28NotMatch((int) notMatchCount);
+                // Here, BATToReview can be set to the size of the filtered GPP28 list.
+                response.setBATToReview(filteredGpp28.size());
+                response.setGppJson28Fields(fieldResults);
+                // Optionally, you can set or append a message regarding the networkName.
+                response.setGppJson28Message("Data processed successfully for network " + networkName);
+
+                responses.add(response);
+            } catch (Exception e) {
+                response.setGppJson28Message("Exception occurred: " + e.getMessage());
+                response.setGppJson28Match(0);
+                response.setBATToReview(0);
+                response.setGppJson28NotMatch(0);
+                response.setGppJson28Fields(Collections.emptyList());
+                responses.add(response);
+            }
+        }
+
+        return responses;
+    }
+
+    /**
+     * Helper method to parse a JSON string into a List of Maps.
+     */
+    private List<Map<String, Object>> parseJson(String jsonStr) {
+        ObjectMapper mapper = new ObjectMapper();
         try {
-            List<NetworkIdTypeDTO> dtoList = repository.findAll().stream()
-                    .map(networkType -> new NetworkIdTypeDTO(
-                            networkType.getNetworkIdTypeRid(),
-                            networkType.getNetworkIdTypeName()))
-                    .collect(Collectors.toList());
-
-            ReqRes response = new ReqRes(200, null, "Data fetched successfully");
-            return new ResponseWrapper<>(dtoList, response);
+            return mapper.readValue(jsonStr, new TypeReference<List<Map<String, Object>>>() {});
         } catch (Exception e) {
-            ReqRes errorResponse = new ReqRes(500, e.getMessage(), "Failed to fetch data");
-            return new ResponseWrapper<>(null, errorResponse);
+            throw new RuntimeException("Failed to parse JSON", e);
         }
     }
-}
 
-
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/network-types")
-public class NetworkIdTypeController {
-
-    @Autowired
-    private NetworkIdTypeService networkIdTypeService;
-
-    @GetMapping
-    public ResponseEntity<ResponseWrapper<List<NetworkIdTypeDTO>>> getAllNetworkTypes() {
-        ResponseWrapper<List<NetworkIdTypeDTO>> response = networkIdTypeService.getAllNetworkTypes();
-        return ResponseEntity.status(response.getReqRes().getStatusCode()).body(response);
+    /**
+     * Helper method to determine if a date string is active.
+     * Adjust the logic as needed based on your date format and rules.
+     */
+    private boolean isActiveDate(String dateStr) {
+        if (dateStr == null || dateStr.length() < 2) {
+            return false;
+        }
+        try {
+            // For example, if the first two digits represent the year, treat years greater than 20 as active.
+            String yearPart = dateStr.substring(0, 2);
+            int year = Integer.parseInt(yearPart);
+            return year > 20;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
