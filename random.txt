@@ -1,2 +1,267 @@
-fieldR.setI(String.valueOf(planObj.get("I")).trim());
-fieldS.setI(String.valueOf(orPlanObj.get("I")).trim());
+package com.example.service;
+
+import com.example.dao.RxSotGppDataDao;
+import com.example.model.GppJson32Field;
+import com.example.model.GppJson32FieldValidationResponse;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class GppJson32Service {
+
+    private static final Logger logger = LogManager.getLogger(GppJson32Service.class);
+
+    // Assume this DAO is injected or instantiated appropriately.
+    private RxSotGppDataDao rxSotGppDataDao = new RxSotGppDataDao();
+
+    /**
+     * Main service method that performs the validations on the fetched GPP JSON32 data.
+     */
+    public List<GppJson32FieldValidationResponse> getGppJson32ByUid(Long uid, Integer currentUserId, String projectName) {
+        try {
+            logger.info("Starting getGppJson32ByUid for uid: {} currentUserId: {} projectName: {}", uid, currentUserId, projectName);
+
+            // ***********************************************************************
+            // Step 1: Fetch data from DB and parse into list of GppJson32Field objects.
+            // ***********************************************************************
+            List<Map<String, Object>> dbRecords = rxSotGppDataDao.fetchEdit32ByUid(uid);
+            List<GppJson32Field> allFields = new ArrayList<>();
+            for (Map<String, Object> record : dbRecords) {
+                GppJson32Field field = new GppJson32Field();
+                // Example of mapping; adjust field conversions as needed.
+                field.setA0001(toString(record.get("A0001")));
+                field.setA0002(toString(record.get("A0002")));
+                field.setA0003(toString(record.get("A0003")));
+                field.setA0004(toString(record.get("A0004")));
+                field.setA0005(toString(record.get("A0005")));
+                field.setADAKDT(toString(record.get("ADAKDT")));
+                field.setADA1DT(toString(record.get("ADA1DT")));
+                field.setADAECD(toString(record.get("ADAECD")));
+                field.setADBOTX(toString(record.get("ADBOTX")));
+                field.setD1G0AN(toString(record.get("D1G0AN")));
+                field.setD1GZAN(toString(record.get("D1GZAN")));
+                field.setD1J0HP(toString(record.get("D1J0HP")));
+                field.setD1MFAN(toString(record.get("D1MFAN")));
+                field.setD1MGAN(toString(record.get("D1MGAN")));
+                field.setD1SVCE(toString(record.get("D1SVCE")));
+                field.setD2G1AN(toString(record.get("D2G1AN")));
+                field.setD2J2HP(toString(record.get("D2J2HP")));
+                field.setNA_01(toString(record.get("NA_01")));
+                // Initially, no status is set.
+                allFields.add(field);
+            }
+            logger.info("Fetched {} records from fetchEdit32ByUid", allFields.size());
+
+            // ***********************************************************************
+            // Step 2: Check for objects with NA_01 equals "Y".
+            // ***********************************************************************
+            List<GppJson32Field> naFields = allFields.stream()
+                    .filter(f -> "Y".equalsIgnoreCase(f.getNA_01()))
+                    .collect(Collectors.toList());
+
+            if (naFields.isEmpty()) {
+                logger.info("No records with NA_01 == 'Y'. Marking all records as 'BAT TO REVIEW'.");
+                allFields.forEach(f -> f.setStatus("BAT TO REVIEW"));
+                return Collections.singletonList(buildResponse(allFields));
+            }
+
+            // ***********************************************************************
+            // Step 2.1: For records with NA_01 == "Y", check for active date in A0002.
+            // ***********************************************************************
+            List<GppJson32Field> validActiveDateFields = naFields.stream()
+                    .filter(f -> isActiveDate(f.getA0002()))
+                    .collect(Collectors.toList());
+
+            // For those NA_01 records that do NOT have an active date, mark status as "BAT TO REVIEW"
+            naFields.forEach(f -> {
+                if (!isActiveDate(f.getA0002())) {
+                    logger.debug("Record with A0002={} is not an active date. Marking as 'BAT TO REVIEW'.", f.getA0002());
+                    f.setStatus("BAT TO REVIEW");
+                }
+            });
+
+            if (validActiveDateFields.isEmpty()) {
+                logger.info("No NA_01 records with an active date. Marking all records as 'BAT TO REVIEW'.");
+                allFields.forEach(f -> f.setStatus("BAT TO REVIEW"));
+                return Collections.singletonList(buildResponse(allFields));
+            }
+
+            // ***********************************************************************
+            // Step 3: For each record (with NA_01 == "Y" and active date), check if A0003 equals D1J0HP.
+            // ***********************************************************************
+            for (GppJson32Field field : validActiveDateFields) {
+                if (field.getA0003() != null && field.getA0003().equals(field.getD1J0HP())) {
+                    // If match then proceed to further validations in Step 4.
+                    logger.debug("Record with A0003={} and D1J0HP={} match. Proceeding to SOT checks.", field.getA0003(), field.getD1J0HP());
+                    // *******************************************************************
+                    // Step 4: Fetch SOT details and perform further checks.
+                    // *******************************************************************
+                    Map<String, Object> sotMap = rxSotGppDataDao.fetchSOTByUid(uid);
+                    // Assuming the structure is: { "sotDetail" : { ... } }
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> sotDetail = (Map<String, String>) sotMap.get("sotDetail");
+                    String openExclusivePreferred = sotDetail.get("OPEN_/EXCLUSIVE_/PREFERRED");
+                    String clientPrePost = sotDetail.get("CLIENT_PRE_/POST_AWP");
+                    // Log the SOT values.
+                    logger.debug("SOT values: OPEN/EXCLUSIVE/PREFERRED={}, CLIENT_PRE_/POST_AWP={}", openExclusivePreferred, clientPrePost);
+
+                    boolean valid = checkFieldValuesForSOT(field, openExclusivePreferred);
+                    if (valid) {
+                        field.setStatus("Match");
+                    } else {
+                        field.setStatus("Not Match");
+                    }
+                } else {
+                    // Step 3: If A0003 and D1J0HP do not match, then mark status as "Not Match"
+                    logger.debug("Record with A0003={} and D1J0HP={} do not match. Marking as 'Not Match'.", field.getA0003(), field.getD1J0HP());
+                    field.setStatus("Not Match");
+                }
+            }
+
+            // ***********************************************************************
+            // Step 6: Ensure that every record has a status. For records not processed above,
+            // we mark them as "BAT TO REVIEW".
+            // ***********************************************************************
+            allFields.forEach(f -> {
+                if (f.getStatus() == null) {
+                    f.setStatus("BAT TO REVIEW");
+                }
+            });
+
+            // Count the number of each status.
+            long matchCount = allFields.stream().filter(f -> "Match".equals(f.getStatus())).count();
+            long notMatchCount = allFields.stream().filter(f -> "Not Match".equals(f.getStatus())).count();
+            long batToReviewCount = allFields.stream().filter(f -> "BAT TO REVIEW".equals(f.getStatus())).count();
+
+            // Build the response.
+            GppJson32FieldValidationResponse response = new GppJson32FieldValidationResponse();
+            response.setGppJson32Match((int) matchCount);
+            response.setGppJson32NotMatch((int) notMatchCount);
+            response.setGppJson32BATToReview((int) batToReviewCount);
+            response.setGppJson32Message("Validation completed");
+            response.setGppJson32Fields(allFields);
+
+            logger.info("Validation completed. Match: {}, Not Match: {}, BAT TO REVIEW: {}", matchCount, notMatchCount, batToReviewCount);
+            return Collections.singletonList(response);
+
+        } catch (Exception e) {
+            logger.error("Exception in getGppJson32ByUid", e);
+            // Depending on your error handling strategy, you may rethrow or handle differently.
+            throw new RuntimeException("Error while processing GPP JSON32 validation", e);
+        }
+    }
+
+    /**
+     * Helper method to check if the given date string is an active date.
+     * 
+     * @param dateStr the date string (e.g. "1391231")
+     * @return true if active; false otherwise.
+     */
+    private boolean isActiveDate(String dateStr) {
+        if (dateStr == null || dateStr.length() < 2) {
+            return false;
+        }
+        try {
+            // For example, if the second and third digits represent the year,
+            // treat years greater than 24 as active.
+            String yearPart = dateStr.substring(1, 3);
+            int year = Integer.parseInt(yearPart);
+            return year > 24;
+        } catch (Exception e) {
+            logger.warn("Error parsing date string: {}", dateStr, e);
+            return false;
+        }
+    }
+
+    /**
+     * Helper method to check field values based on the SOT's OPEN/EXCLUSIVE/PREFERRED value.
+     * The chart below defines valid values for the fields.
+     *
+     * For "Open":
+     *   - A0003 and D1J0HP must be one of: EBP01P, EBP01, EBPPE1, EBPPE3
+     * For "Exclusive", "Preferred", or "Exclusive w/Grace Fills":
+     *   - A0003 and D1J0HP must be one of: EBP02P, EBP02, EBPPE1, EBPPE3
+     *
+     * Additionally, the following must be true:
+     *   - D1GZAN equals "S"
+     *   - D1MFAN equals "Y"
+     *   - D1MGAN equals "N"
+     *   - D2G1AN equals "N"
+     *   - D2J2HP equals "70"
+     *
+     * @param field the GppJson32Field record to validate.
+     * @param openExclusivePreferred the SOT value.
+     * @return true if all checks pass; false otherwise.
+     */
+    private boolean checkFieldValuesForSOT(GppJson32Field field, String openExclusivePreferred) {
+        Set<String> allowedValues = new HashSet<>();
+        if (openExclusivePreferred == null) {
+            logger.warn("SOT value OPEN_/EXCLUSIVE_/PREFERRED is null");
+            return false;
+        }
+        switch (openExclusivePreferred.trim()) {
+            case "Open":
+                allowedValues.addAll(Arrays.asList("EBP01P", "EBP01", "EBPPE1", "EBPPE3"));
+                break;
+            case "Exclusive":
+            case "Preferred":
+            case "Exclusive w/Grace Fills":
+                allowedValues.addAll(Arrays.asList("EBP02P", "EBP02", "EBPPE1", "EBPPE3"));
+                break;
+            default:
+                logger.warn("Unexpected SOT value: {}", openExclusivePreferred);
+                return false;
+        }
+        // Check A0003 and D1J0HP belong to the allowed set.
+        if (!allowedValues.contains(field.getA0003())) {
+            logger.debug("A0003 value {} is not in allowed set {} for SOT value {}", field.getA0003(), allowedValues, openExclusivePreferred);
+            return false;
+        }
+        if (!allowedValues.contains(field.getD1J0HP())) {
+            logger.debug("D1J0HP value {} is not in allowed set {} for SOT value {}", field.getD1J0HP(), allowedValues, openExclusivePreferred);
+            return false;
+        }
+        // Check the remaining fields.
+        if (!"S".equals(field.getD1GZAN())) {
+            return false;
+        }
+        if (!"Y".equals(field.getD1MFAN())) {
+            return false;
+        }
+        if (!"N".equals(field.getD1MGAN())) {
+            return false;
+        }
+        if (!"N".equals(field.getD2G1AN())) {
+            return false;
+        }
+        if (!"70".equals(field.getD2J2HP())) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Helper method to build the final response.
+     */
+    private GppJson32FieldValidationResponse buildResponse(List<GppJson32Field> fields) {
+        long matchCount = fields.stream().filter(f -> "Match".equals(f.getStatus())).count();
+        long notMatchCount = fields.stream().filter(f -> "Not Match".equals(f.getStatus())).count();
+        long batCount = fields.stream().filter(f -> "BAT TO REVIEW".equals(f.getStatus())).count();
+
+        GppJson32FieldValidationResponse response = new GppJson32FieldValidationResponse();
+        response.setGppJson32Match((int) matchCount);
+        response.setGppJson32NotMatch((int) notMatchCount);
+        response.setGppJson32BATToReview((int) batCount);
+        response.setGppJson32Message("Validation completed");
+        response.setGppJson32Fields(fields);
+        return response;
+    }
+
+    /**
+     * Utility to safely convert an Object to String.
+     */
+    private String toString(Object obj) {
+        return obj == null ? null : String.valueOf(obj);
+    }
+}
