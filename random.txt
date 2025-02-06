@@ -1,308 +1,275 @@
-package com.example.service;
-
-import com.example.dao.RxSotGppDataDao;
-import com.example.model.GppJson32Field;
-import com.example.model.GppJson32FieldValidationResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Service;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-public class GppJson32Service {
+@Service
+public class GppJson28Service {
 
-    private static final Logger logger = LogManager.getLogger(GppJson32Service.class);
-    
-    // Example executorService instance.
-    private ExecutorService executorService = Executors.newFixedThreadPool(2);
+    private final SOTNetworkMasterRepository sotNetworkMasterRepository;
+    private final GppJson28Dao gppJson28Dao;
 
-    // Assume this DAO is injected or instantiated appropriately.
-    private RxSotGppDataDao rxSotGppDataDao = new RxSotGppDataDao();
+    @PersistenceContext
+    private EntityManager entityManager;
 
-    /**
-     * Main service method that performs validations on the fetched GPP JSON32 data.
-     */
-    public List<GppJson32FieldValidationResponse> getGppJson32ByUid(Long uid, Integer currentUserId, String projectName) {
-        ObjectMapper mapper = new ObjectMapper();
-        GppJson32FieldValidationResponse response = null;
-        try {
-            logger.info("Starting getGppJson32ByUid for uid: {} currentUserId: {} projectName: {}", uid, currentUserId, projectName);
+    public GppJson28Service(SOTNetworkMasterRepository sotNetworkMasterRepository,
+                            GppJson28Dao gppJson28Dao) {
+        this.sotNetworkMasterRepository = sotNetworkMasterRepository;
+        this.gppJson28Dao = gppJson28Dao;
+    }
 
-            // ***********************************************************************
-            // Step 1: Fetch data from DB as a JSON String and parse it.
-            // ***********************************************************************
-            String jsonRecords = rxSotGppDataDao.fetchEdit32ByUid(uid);
-            List<Map<String, Object>> dbRecords = mapper.readValue(jsonRecords, new TypeReference<List<Map<String, Object>>>() {});
-            List<GppJson32Field> allFields = new ArrayList<>();
-            for (Map<String, Object> record : dbRecords) {
-                GppJson32Field field = new GppJson32Field();
-                // Map each record; adjust conversion if necessary.
-                field.setA0001(toString(record.get("A0001")));
-                field.setA0002(toString(record.get("A0002")));
-                field.setA0003(toString(record.get("A0003")));
-                field.setA0004(toString(record.get("A0004")));
-                field.setA0005(toString(record.get("A0005")));
-                field.setADAKDT(toString(record.get("ADAKDT")));
-                field.setADA1DT(toString(record.get("ADA1DT")));
-                field.setADAECD(toString(record.get("ADAECD")));
-                field.setADBOTX(toString(record.get("ADBOTX")));
-                field.setD1G0AN(toString(record.get("D1G0AN")));
-                field.setD1GZAN(toString(record.get("D1GZAN")));
-                field.setD1J0HP(toString(record.get("D1J0HP")));
-                field.setD1MFAN(toString(record.get("D1MFAN")));
-                field.setD1MGAN(toString(record.get("D1MGAN")));
-                field.setD1SVCE(toString(record.get("D1SVCE")));
-                field.setD2G1AN(toString(record.get("D2G1AN")));
-                field.setD2J2HP(toString(record.get("D2J2HP")));
-                field.setNA_01(toString(record.get("NA_01")));
-                // Initially, no status and no failed validations are set.
-                allFields.add(field);
-            }
-            logger.info("Fetched {} records from fetchEdit32ByUid", allFields.size());
+    public List<GppJson28FieldValidationResponse> getGppJson28ByUid(Long uid, Integer currentUserId, String projectName) {
 
-            // ***********************************************************************
-            // Step 2: Separate records with NA_01 = "Y" from those that are not.
-            // ***********************************************************************
-            List<GppJson32Field> naFields = allFields.stream()
-                    .filter(f -> "Y".equalsIgnoreCase(f.getNA_01()))
-                    .collect(Collectors.toList());
+        List<GppJson28FieldValidationResponse> responses = new ArrayList<>();
 
-            List<GppJson32Field> nonNaFields = allFields.stream()
-                    .filter(f -> !"Y".equalsIgnoreCase(f.getNA_01()))
-                    .collect(Collectors.toList());
+        // ===================== STEP 1 =====================
+        // Fetch SOTNetworkMaster rows with networkIdTypeRid = 3 and extract unique gppNetworkName values.
+        List<SOTNetworkMaster> sotList = sotNetworkMasterRepository.findByNetworkIdType_NetworkIdTypeRid(3);
+        Set<String> uniqueGppNetworkNames = sotList.stream()
+                .map(SOTNetworkMaster::getGppNetworkName)
+                .collect(Collectors.toSet());
+        // For example, this set might contain "ASCEND" and "COVID".
 
-            // Mark non-"Y" records as "BAT TO REVIEW"
-            nonNaFields.forEach(f -> {
-                logger.debug("Marking record with NA_01={} as 'BAT TO REVIEW'.", f.getNA_01());
-                f.setStatus("BAT TO REVIEW");
-            });
+        // Process each network name separately.
+        for (String networkName : uniqueGppNetworkNames) {
+            GppJson28FieldValidationResponse response = new GppJson28FieldValidationResponse();
+            response.setGppJson28Message(""); // initialize message
 
-            // If there are no NA_01 == "Y" records then return all records.
-            if (naFields.isEmpty()) {
-                logger.info("No records with NA_01 == 'Y'. Returning all records with status 'BAT TO REVIEW'.");
-                response = buildResponse(allFields);
-                executeStorageLogic(response);
-                return Collections.singletonList(response);
-            }
-
-            // ***********************************************************************
-            // Step 2.1: For records with NA_01 == "Y", check for active date in A0002.
-            // ***********************************************************************
-            List<GppJson32Field> validActiveDateFields = naFields.stream()
-                    .filter(f -> isActiveDate(f.getA0002()))
-                    .collect(Collectors.toList());
-
-            // Mark NA_01 records without an active date as "BAT TO REVIEW"
-            naFields.forEach(f -> {
-                if (!isActiveDate(f.getA0002())) {
-                    logger.debug("Record with A0002={} is not an active date. Marking as 'BAT TO REVIEW'.", f.getA0002());
-                    f.setStatus("BAT TO REVIEW");
+            try {
+                // ===================== STEP 2 =====================
+                // Query to fetch the primary JSON data from rx_sot_gpp_data for the given uid.
+                Query query = entityManager.createNativeQuery("SELECT gpp_json4 FROM rxcl_audit.rx_sot_gpp_data WHERE uid = " + uid);
+                List<?> resultList = query.getResultList();
+                if (resultList.isEmpty()) {
+                    throw new RuntimeException("Data not found for uid " + uid);
                 }
-            });
+                // Since the query returns a single column (String), cast directly:
+                String gppJson = (String) resultList.get(0);
 
-            if (validActiveDateFields.isEmpty()) {
-                logger.info("No NA_01 records with an active date. Returning all records with status 'BAT TO REVIEW'.");
-                response = buildResponse(allFields);
-                executeStorageLogic(response);
-                return Collections.singletonList(response);
-            }
+                // Parse the primary JSON into a list of maps.
+                List<Map<String, Object>> gppJsonObjects = parseJson(gppJson);
 
-            // ***********************************************************************
-            // Step 3: For each valid NA_01 record (with active date), check if A0003 equals D1J0HP.
-            // ***********************************************************************
-            for (GppJson32Field field : validActiveDateFields) {
-                if (field.getA0003() != null && field.getA0003().equals(field.getD1J0HP())) {
-                    logger.debug("Record with A0003={} and D1J0HP={} match. Proceeding to SOT checks.", field.getA0003(), field.getD1J0HP());
-                    // *******************************************************************
-                    // Step 4: Fetch SOT details and perform further checks.
-                    // *******************************************************************
-                    String jsonSot = rxSotGppDataDao.fetchSOTByUid(uid);
-                    Map<String, Object> sotMap = mapper.readValue(jsonSot, new TypeReference<Map<String, Object>>() {});
-                    @SuppressWarnings("unchecked")
-                    Map<String, String> sotDetail = (Map<String, String>) sotMap.get("sotDetail");
-                    String openExclusivePreferred = sotDetail.get("OPEN_/EXCLUSIVE_/PREFERRED");
-                    String clientPrePost = sotDetail.get("CLIENT_PRE_/POST_AWP");
-                    logger.debug("SOT values: OPEN/EXCLUSIVE/PREFERRED={}, CLIENT_PRE_/POST_AWP={}", openExclusivePreferred, clientPrePost);
+                // Filter the objects for the current network name (e.g. "ASCEND" or "COVID")
+                List<Map<String, Object>> filteredByNetwork = gppJsonObjects.stream()
+                        .filter(map -> networkName.equalsIgnoreCase(String.valueOf(map.get("NTWK_ID"))))
+                        .collect(Collectors.toList());
 
-                    boolean valid = checkFieldValuesForSOT(field, openExclusivePreferred);
-                    if (valid) {
-                        field.setStatus("Match");
-                    } else {
-                        field.setStatus("Not Match");
+                // ===================== STEP 3 =====================
+                // Filter out objects with blank "OR_PLAN_CODE"
+                List<Map<String, Object>> nonBlankPlan = filteredByNetwork.stream()
+                        .filter(map -> {
+                            Object orPlan = map.get("OR_PLAN_CODE");
+                            return orPlan != null && !String.valueOf(orPlan).trim().isEmpty();
+                        })
+                        .collect(Collectors.toList());
+
+                // ===================== STEP 4 =====================
+                // Group by unique combination of PLAN_CODE and OR_PLAN_CODE.
+                // The key is built as "PLAN_CODE_OR_PLAN_CODE" (trimmed).
+                Map<String, Map<String, Object>> uniquePlanPairs = nonBlankPlan.stream()
+                        .collect(Collectors.toMap(
+                                map -> String.valueOf(map.get("PLAN_CODE")).trim() + "_" + String.valueOf(map.get("OR_PLAN_CODE")).trim(),
+                                map -> map,
+                                (existing, replacement) -> existing  // in case of duplicate, keep one.
+                        ));
+
+                if (uniquePlanPairs.isEmpty()) {
+                    response.setGppJson28Message("No Retail Plan Code Found");
+                }
+
+                // ===================== STEP 5 =====================
+                // Fetch the secondary JSON string from the DAO and parse it.
+                String gppJson28Str = gppJson28Dao.findGppJson28ByUid(uid);
+                List<Map<String, Object>> gppJson28List = parseJson(gppJson28Str);
+
+                // ===================== STEP 5.1 (Modified) =====================
+                // If no retail plan pairs were found, then for every object in gppJson28List,
+                // create a GppJson28Field with status "BAT to Review" and return those.
+                if ("No Retail Plan Code Found".equals(response.getGppJson28Message())) {
+                    List<GppJson28Field> batFields = new ArrayList<>();
+                    for (Map<String, Object> map : gppJson28List) {
+                        GppJson28Field batField = mapToGppJson28Field(map, "BAT to Review");
+                        batFields.add(batField);
                     }
-                } else {
-                    // If A0003 and D1J0HP do not match, mark as "Not Match" and record the failed columns.
-                    logger.debug("Record with A0003={} and D1J0HP={} do not match. Marking as 'Not Match'.", field.getA0003(), field.getD1J0HP());
-                    field.setFailedValidation("A0003, D1J0HP");
-                    field.setStatus("Not Match");
+                    response.setGppJson28Match(0);
+                    response.setBATToReview(gppJson28List.size());
+                    response.setGppJson28NotMatch(0);
+                    response.setGppJson28Fields(batFields);
+                    responses.add(response);
+                    continue; // move to the next network name
                 }
-            }
 
-            // ***********************************************************************
-            // Step 6: Ensure that every record has a status.
-            // ***********************************************************************
-            allFields.forEach(f -> {
-                if (f.getStatus() == null) {
-                    f.setStatus("BAT TO REVIEW");
+                // ===================== STEP 5.2 =====================
+                // Filter the gppJson28List for objects where F = "Y" and G = "02" (after trimming).
+                List<Map<String, Object>> filteredGpp28 = gppJson28List.stream()
+                        .filter(map -> "Y".equalsIgnoreCase(String.valueOf(map.get("F")).trim())
+                                && "02".equalsIgnoreCase(String.valueOf(map.get("G")).trim()))
+                        .collect(Collectors.toList());
+                if (filteredGpp28.isEmpty()) {
+                    response.setGppJson28Message("No combination of Opt 28 =Y and Price Opt# = 02 found");
+                    response.setGppJson28Match(0);
+                    response.setBATToReview(gppJson28List.size());
+                    response.setGppJson28NotMatch(0);
+                    response.setGppJson28Fields(Collections.emptyList());
+                    responses.add(response);
+                    continue;
                 }
-            });
 
-            // Build the response.
-            long matchCount = allFields.stream().filter(f -> "Match".equals(f.getStatus())).count();
-            long notMatchCount = allFields.stream().filter(f -> "Not Match".equals(f.getStatus())).count();
-            long batToReviewCount = allFields.stream().filter(f -> "BAT TO REVIEW".equals(f.getStatus())).count();
+                // ===================== STEP 6 to 8 (Modified) =====================
+                // Process each unique retail plan pair and produce two GppJson28Field objects per pair,
+                // and track used objects.
+                List<GppJson28Field> fieldResults = new ArrayList<>();
+                Set<Map<String, Object>> usedObjects = new HashSet<>();
 
-            response = new GppJson32FieldValidationResponse();
-            response.setGppJson32Match((int) matchCount);
-            response.setGppJson32NotMatch((int) notMatchCount);
-            response.setGppJson32BATToReview((int) batToReviewCount);
-            response.setGppJson32Message("Validation completed");
-            response.setGppJson32Fields(allFields);
-            logger.info("Validation completed. Match: {}, Not Match: {}, BAT TO REVIEW: {}", matchCount, notMatchCount, batToReviewCount);
+                for (Map.Entry<String, Map<String, Object>> entry : uniquePlanPairs.entrySet()) {
+                    // Retrieve the pair values.
+                    String planCode = String.valueOf(entry.getValue().get("PLAN_CODE")).trim();    // e.g., "EDHLTP04 R"
+                    String orPlanCode = String.valueOf(entry.getValue().get("OR_PLAN_CODE")).trim(); // e.g., "EDHLTP04 S"
 
-        } catch (Exception e) {
-            logger.error("Exception in getGppJson32ByUid", e);
-            throw new RuntimeException("Error while processing GPP JSON32 validation", e);
-        } finally {
-            // Mandatory storage logic always executes.
-            if (response != null) {
-                executeStorageLogic(response);
+                    // Get matching objects from filteredGpp28 for each side using the ADAECD field.
+                    List<Map<String, Object>> planData = filteredGpp28.stream()
+                            .filter(map -> planCode.equalsIgnoreCase(String.valueOf(map.get("ADAECD")).trim()))
+                            .collect(Collectors.toList());
+                    List<Map<String, Object>> orPlanData = filteredGpp28.stream()
+                            .filter(map -> orPlanCode.equalsIgnoreCase(String.valueOf(map.get("ADAECD")).trim()))
+                            .collect(Collectors.toList());
+
+                    // If either side is missing, record a no-pair result.
+                    if (planData.isEmpty() || orPlanData.isEmpty()) {
+                        GppJson28Field field = new GppJson28Field();
+                        field.setFAILEDVALIDATION("No Pair found");
+                        fieldResults.add(field);
+                        continue;
+                    }
+
+                    // Look for the first active record in each list.
+                    Optional<Map<String, Object>> activePlanObj = planData.stream()
+                        .filter(map -> isActiveDate(String.valueOf(map.get("I")).trim()))
+                        .findFirst();
+
+                    Optional<Map<String, Object>> activeOrPlanObj = orPlanData.stream()
+                        .filter(map -> isActiveDate(String.valueOf(map.get("I")).trim()))
+                        .findFirst();
+
+                    if (!activePlanObj.isPresent() || !activeOrPlanObj.isPresent()) {
+                        GppJson28Field field = new GppJson28Field();
+                        field.setFAILEDVALIDATION("Non-active date");
+                        fieldResults.add(field);
+                        continue;
+                    }
+
+                    Map<String, Object> planObj = activePlanObj.get();
+                    Map<String, Object> orPlanObj = activeOrPlanObj.get();
+
+                    // Mark these objects as used.
+                    usedObjects.add(planObj);
+                    usedObjects.add(orPlanObj);
+
+                    // Compare the "K" field values.
+                    String planK = String.valueOf(planObj.get("K")).trim();
+                    String orPlanK = String.valueOf(orPlanObj.get("K")).trim();
+                    String validationResult = planK.equals(orPlanK) ? "Match" : "Not Match";
+
+                    // Create two separate GppJson28Field objects for the pair.
+                    GppJson28Field fieldR = mapToGppJson28Field(planObj, validationResult);
+                    GppJson28Field fieldS = mapToGppJson28Field(orPlanObj, validationResult);
+
+                    // Add both objects to the result list.
+                    fieldResults.add(fieldR);
+                    fieldResults.add(fieldS);
+                }
+
+                // ===================== STEP 7: Add Unused Records =====================
+                // For every object in filteredGpp28 that was not used in any pairing, mark it with status "BAT to Review".
+                for (Map<String, Object> map : filteredGpp28) {
+                    if (!usedObjects.contains(map)) {
+                        GppJson28Field batField = mapToGppJson28Field(map, "BAT to Review");
+                        fieldResults.add(batField);
+                    }
+                }
+
+                // ===================== STEP 8: Finalize the Response =====================
+                // Count matches vs. not matches from the processed fields.
+                long matchCount = fieldResults.stream()
+                        .filter(f -> "Match".equalsIgnoreCase(f.getFAILEDVALIDATION()))
+                        .count();
+                long notMatchCount = fieldResults.stream()
+                        .filter(f -> "Not Match".equalsIgnoreCase(f.getFAILEDVALIDATION()))
+                        .count();
+                response.setGppJson28Match((int) matchCount);
+                response.setGppJson28NotMatch((int) notMatchCount);
+                // Set BATToReview to the size of filteredGpp28 (all objects with F="Y" and G="02")
+                response.setBATToReview(filteredGpp28.size());
+                response.setGppJson28Fields(fieldResults);
+                response.setGppJson28Message("Data processed successfully for network " + networkName);
+
+                responses.add(response);
+            } catch (Exception e) {
+                response.setGppJson28Message("Exception occurred: " + e.getMessage());
+                response.setGppJson28Match(0);
+                response.setBATToReview(0);
+                response.setGppJson28NotMatch(0);
+                response.setGppJson28Fields(Collections.emptyList());
+                responses.add(response);
             }
         }
-        return Collections.singletonList(response);
+
+        return responses;
     }
 
     /**
-     * Helper method to check if the given date string is an active date.
+     * Helper method to parse a JSON string into a List of Maps.
+     */
+    private List<Map<String, Object>> parseJson(String jsonStr) {
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            return mapper.readValue(jsonStr, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse JSON", e);
+        }
+    }
+
+    /**
+     * Helper method to determine if a date string represents an active date.
+     * Adjust the logic as needed based on your date format and rules.
      */
     private boolean isActiveDate(String dateStr) {
         if (dateStr == null || dateStr.length() < 2) {
             return false;
         }
         try {
-            // Example: if the second and third digits represent the year,
-            // treat years greater than 24 as active.
-            String yearPart = dateStr.substring(1, 3);
+            // Example: if the first two digits represent the year, treat years greater than 20 as active.
+            String yearPart = dateStr.substring(0, 2);
             int year = Integer.parseInt(yearPart);
-            return year > 24;
+            return year > 20;
         } catch (Exception e) {
-            logger.warn("Error parsing date string: {}", dateStr, e);
             return false;
         }
     }
 
     /**
-     * Helper method to check field values based on the SOT's OPEN/EXCLUSIVE/PREFERRED value.
-     * Also accumulates the names of the fields that fail their respective validations.
-     *
-     * For "Open":
-     *   - A0003 and D1J0HP must be one of: EBP01P, EBP01, EBPPE1, EBPPE3
-     * For "Exclusive", "Preferred", or "Exclusive w/Grace Fills":
-     *   - A0003 and D1J0HP must be one of: EBP02P, EBP02, EBPPE1, EBPPE3
-     *
-     * Additionally, the following must be true:
-     *   - D1GZAN equals "S"
-     *   - D1MFAN equals "Y"
-     *   - D1MGAN equals "N"
-     *   - D2G1AN equals "N"
-     *   - D2J2HP equals "70"
-     *
-     * If any check fails, the corresponding field name is added to the record's failedValidation field.
-     *
-     * @param field the record to validate.
-     * @param openExclusivePreferred the SOT value.
-     * @return true if all checks pass; false otherwise.
+     * Helper method to map a given Map (representing JSON data) to a GppJson28Field.
+     * The provided validationStatus will be set into the FAILEDVALIDATION field.
      */
-    private boolean checkFieldValuesForSOT(GppJson32Field field, String openExclusivePreferred) {
-        List<String> failedFields = new ArrayList<>();
-        Set<String> allowedValues = new HashSet<>();
-        if (openExclusivePreferred == null) {
-            logger.warn("SOT value OPEN_/EXCLUSIVE_/PREFERRED is null");
-            failedFields.add("OPEN_/EXCLUSIVE_/PREFERRED");
-            field.setFailedValidation(String.join(", ", failedFields));
-            return false;
-        }
-        switch (openExclusivePreferred.trim()) {
-            case "Open":
-                allowedValues.addAll(Arrays.asList("EBP01P", "EBP01", "EBPPE1", "EBPPE3"));
-                break;
-            case "Exclusive":
-            case "Preferred":
-            case "Exclusive w/Grace Fills":
-                allowedValues.addAll(Arrays.asList("EBP02P", "EBP02", "EBPPE1", "EBPPE3"));
-                break;
-            default:
-                logger.warn("Unexpected SOT value: {}", openExclusivePreferred);
-                failedFields.add("OPEN_/EXCLUSIVE_/PREFERRED");
-                field.setFailedValidation(String.join(", ", failedFields));
-                return false;
-        }
-        if (!allowedValues.contains(field.getA0003())) {
-            failedFields.add("A0003");
-        }
-        if (!allowedValues.contains(field.getD1J0HP())) {
-            failedFields.add("D1J0HP");
-        }
-        if (!"S".equals(field.getD1GZAN())) {
-            failedFields.add("D1GZAN");
-        }
-        if (!"Y".equals(field.getD1MFAN())) {
-            failedFields.add("D1MFAN");
-        }
-        if (!"N".equals(field.getD1MGAN())) {
-            failedFields.add("D1MGAN");
-        }
-        if (!"N".equals(field.getD2G1AN())) {
-            failedFields.add("D2G1AN");
-        }
-        if (!"70".equals(field.getD2J2HP())) {
-            failedFields.add("D2J2HP");
-        }
-        if (!failedFields.isEmpty()) {
-            field.setFailedValidation(String.join(", ", failedFields));
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Helper method to build the final response.
-     */
-    private GppJson32FieldValidationResponse buildResponse(List<GppJson32Field> fields) {
-        long matchCount = fields.stream().filter(f -> "Match".equals(f.getStatus())).count();
-        long notMatchCount = fields.stream().filter(f -> "Not Match".equals(f.getStatus())).count();
-        long batCount = fields.stream().filter(f -> "BAT TO REVIEW".equals(f.getStatus())).count();
-
-        GppJson32FieldValidationResponse response = new GppJson32FieldValidationResponse();
-        response.setGppJson32Match((int) matchCount);
-        response.setGppJson32NotMatch((int) notMatchCount);
-        response.setGppJson32BATToReview((int) batCount);
-        response.setGppJson32Message("Validation completed");
-        response.setGppJson32Fields(fields);
-        return response;
-    }
-
-    /**
-     * Executes the mandatory storage logic asynchronously.
-     */
-    private void executeStorageLogic(GppJson32FieldValidationResponse response) {
-        executorService.execute(() -> {
-            try {
-                // Place your DB storage logic here.
-                // For example: storeResponseToDb(response);
-            } catch (Exception e) {
-                logger.error("Error during storage logic", e);
-            }
-        });
-    }
-
-    /**
-     * Utility to safely convert an Object to a String.
-     */
-    private String toString(Object obj) {
-        return obj == null ? null : String.valueOf(obj);
+    private GppJson28Field mapToGppJson28Field(Map<String, Object> map, String validationStatus) {
+        GppJson28Field field = new GppJson28Field();
+        field.setADA1DT(String.valueOf(map.get("ADA1DT")));
+        field.setF(String.valueOf(map.get("F")));
+        field.setG(String.valueOf(map.get("G")));
+        field.setH(String.valueOf(map.get("H")));
+        field.setI(String.valueOf(map.get("I")).trim());
+        field.setADAKDT(String.valueOf(map.get("ADAKDT")));
+        field.setJ(String.valueOf(map.get("J")));
+        field.setK(String.valueOf(map.get("K")).trim());
+        field.setADBOTX(String.valueOf(map.get("ADBOTX")));
+        field.setL(String.valueOf(map.get("L")));
+        field.setADAECD(String.valueOf(map.get("ADAECD")));
+        field.setFAILEDVALIDATION(validationStatus);
+        return field;
     }
 }
